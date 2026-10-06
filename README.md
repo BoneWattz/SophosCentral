@@ -19,3 +19,8 @@ Next.js (React) app: Supabase email/password login + a dashboard of devices enro
 4. `npm install` then `npm run dev` → http://localhost:3000
 
 Sophos credentials stay server-side; the browser only talks to `/api/*`.
+
+## Deploy to Netlify
+
+Import the GitHub repo in Netlify (it auto-detects Next.js), then add these in Site configuration -> Environment variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `ALLOWED_EMAIL_DOMAIN`, `SOPHOS_CLIENT_ID`, `SOPHOS_CLIENT_SECRET` (mark the Sophos secret as secret). In Supabase -> Authentication -> URL Configuration, add your Netlify URL as the Site URL.
+
