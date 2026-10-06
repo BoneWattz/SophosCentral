@@ -94,12 +94,16 @@ label { display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; }
   background: var(--surface); border-right: 1px solid var(--border);
   padding: 18px 12px; display: flex; flex-direction: column; gap: 4px;
   transition: width 0.15s ease;
+  /* Sits above the sticky top bar so the toggle isn't clipped, and casts a shadow onto the page. */
+  z-index: 8;
+  box-shadow: 4px 0 18px rgba(16, 24, 40, 0.10);
 }
+:root[data-theme="dark"] .sidebar { box-shadow: 4px 0 18px rgba(0, 0, 0, 0.5); }
 .sidebar .brand { padding: 4px 8px 18px; }
 .sidebar-toggle {
-  position: absolute; top: 56px; right: -12px; width: 24px; height: 24px; border-radius: 50%;
-  border: 0; background: var(--accent); color: #fff; display: grid; place-items: center; padding: 0;
-  box-shadow: 0 1px 3px rgba(0,0,0,.25); z-index: 5;
+  position: absolute; top: 22px; right: -13px; width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid var(--surface); background: var(--accent); color: #fff; display: grid; place-items: center; padding: 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,.3); z-index: 9;
 }
 .nav-section { font-size: 0.7rem; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; padding: 16px 10px 6px; }
 .nav-link {
@@ -135,7 +139,7 @@ label { display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; }
   width: 100%; text-align: left; padding: 9px 10px; border: 0; background: transparent; color: var(--text); border-radius: 8px;
 }
 .menu button:hover { background: var(--surface-2); }
-.content { padding: 28px 28px 40px; max-width: 1280px; width: 100%; }
+.content { padding: 28px 28px 40px; max-width: 1400px; width: 100%; margin: 0 auto; }
 .page-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-bottom: 18px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
 .page-head .actions { display: flex; gap: 8px; }
 
@@ -174,6 +178,20 @@ td.actions-cell { text-align: right; width: 1%; }
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; z-index: 20; }
 .modal { width: 100%; max-width: 420px; padding: 24px; display: flex; flex-direction: column; gap: 14px; }
 .modal .row { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* Let table cells wrap on mid-size screens so the table fits without side-scrolling. */
+@media (max-width: 1200px) {
+  th, td { padding-left: 12px; padding-right: 12px; }
+  td { white-space: normal; word-break: break-word; }
+  td.actions-cell { white-space: nowrap; }
+}
+@media (max-width: 600px) {
+  .table-toolbar { flex-direction: column; }
+  .table-toolbar select { width: 100%; }
+  .page-head h1 { font-size: 1.35rem; }
+  table { font-size: 0.82rem; }
+  th, td { padding-left: 10px; padding-right: 10px; }
+}
 
 @media (max-width: 800px) {
   .sidebar { width: 66px; }
