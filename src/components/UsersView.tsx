@@ -12,6 +12,17 @@ interface UserRow {
   lastSignInAt: string | null;
 }
 
+// Parses a JSON reply; if the server sent something else (e.g. a hosting error page),
+// returns a readable message that includes the HTTP status.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function readJson(res: Response): Promise<any> {
+  try {
+    return await res.json();
+  } catch {
+    return { error: `Server error (HTTP ${res.status}). Check the Netlify function logs.` };
+  }
+}
+
 export default function UsersView({ currentEmail }: { currentEmail: string }) {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,14 +34,15 @@ export default function UsersView({ currentEmail }: { currentEmail: string }) {
     setLoading(true);
     try {
       const res = await fetch("/api/users", { cache: "no-store" });
-      const body = await res.json();
+      const body = await readJson(res);
       if (!res.ok) {
         setError(body.error ?? "Failed to load users");
         return;
       }
+      setError(null);
       setUsers(body.users);
     } catch {
-      setError("Network error. Please try again.");
+      setError("Could not reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -45,7 +57,7 @@ export default function UsersView({ currentEmail }: { currentEmail: string }) {
     setError(null);
     setMessage(null);
     const res = await fetch(`/api/users?id=${encodeURIComponent(u.id)}`, { method: "DELETE" });
-    const body = await res.json();
+    const body = await readJson(res);
     if (!res.ok) {
       setError(body.error ?? "Failed to delete user");
       return;
@@ -146,14 +158,14 @@ function AddUserModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, role }),
       });
-      const body = await res.json();
+      const body = await readJson(res);
       if (!res.ok) {
         setError(body.error ?? "Failed to add user");
         return;
       }
       await onAdded(email);
     } catch {
-      setError("Network error. Please try again.");
+      setError("Could not reach the server. Check your connection and try again.");
     } finally {
       setSaving(false);
     }
