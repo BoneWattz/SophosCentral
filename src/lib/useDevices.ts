@@ -8,9 +8,15 @@ export interface Device {
   hostname: string;
   type: string;
   os: string;
+  platform: string;
+  isServer: boolean;
   health: string;
   user: string | null;
   ip: string | null;
+  mac: string | null;
+  serialNumber: string | null;
+  online: boolean | null;
+  registeredAt: string | null;
   lastSeenAt: string | null;
   tamperProtection: boolean | null;
 }
@@ -28,11 +34,12 @@ export function useDevices() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  // `force` bypasses the server's short-lived cache (used by the Refresh button).
+  const load = useCallback(async (force = false) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/devices", { cache: "no-store" });
+      const res = await fetch(force ? "/api/devices?refresh=1" : "/api/devices", { cache: "no-store" });
       if (res.status === 401) {
         router.replace("/login");
         return;
@@ -51,5 +58,5 @@ export function useDevices() {
     load();
   }, [load]);
 
-  return { data, loading, error, reload: load };
+  return { data, loading, error, reload: () => load(true) };
 }

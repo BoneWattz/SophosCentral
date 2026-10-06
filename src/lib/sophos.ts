@@ -12,10 +12,30 @@ export interface SophosEndpoint {
   health?: { overall?: string };
   associatedPerson?: { name?: string; viaLogin?: string };
   ipv4Addresses?: string[];
+  macAddresses?: string[];
   lastSeenAt?: string;
+  registeredAt?: string;
+  serialNumber?: string;
+  online?: boolean;
   tamperProtectionEnabled?: boolean;
   assignedProducts?: { code: string; version?: string; status?: string }[];
 }
+
+const ENDPOINT_FIELDS = [
+  "id",
+  "type",
+  "hostname",
+  "health",
+  "os",
+  "ipv4Addresses",
+  "macAddresses",
+  "associatedPerson",
+  "tamperProtectionEnabled",
+  "lastSeenAt",
+  "registeredAt",
+  "serialNumber",
+  "online",
+].join(",");
 
 interface Session {
   accessToken: string;
@@ -89,6 +109,9 @@ export async function listEndpoints(): Promise<SophosEndpoint[]> {
     const url = new URL(`${session.apiHost}/endpoint/v1/endpoints`);
     url.searchParams.set("pageSize", "500");
     url.searchParams.set("pageTotal", "true");
+    // serialNumber is only returned by the "full" view; `fields` keeps the payload small.
+    url.searchParams.set("view", "full");
+    url.searchParams.set("fields", ENDPOINT_FIELDS);
     if (pageFromKey) url.searchParams.set("pageFromKey", pageFromKey);
 
     const res = await fetch(url, {

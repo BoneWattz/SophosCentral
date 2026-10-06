@@ -4,9 +4,41 @@ import { listEndpoints } from "@/lib/sophos";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/devices
+const CACHE_MS = 2 * 60_000;
+
+interface Payload {
+  summary: { total: number; byHealth: Record<string, number> };
+  devices: ReturnType<typeof toDevice>[];
+  fetchedAt: string;
+}
+
+// Sophos takes a few seconds per 500 devices, so reuse the last result for a couple
+// of minutes. Every caller is already authorised to see the same tenant data.
+let cache: { at: number; payload: Payload } | null = null;
+
+function toDevice(e: Awaited<ReturnType<typeof listEndpoints>>[number]) {
+  return {
+    id: e.id,
+    hostname: e.hostname,
+    type: e.type,
+    os: e.os?.name ?? e.os?.platform ?? "Unknown",
+    platform: e.os?.platform ?? "unknown",
+    isServer: e.os?.isServer ?? false,
+    health: e.health?.overall ?? "unknown",
+    user: e.associatedPerson?.viaLogin ?? e.associatedPerson?.name ?? null,
+    ip: e.ipv4Addresses?.[0] ?? null,
+    mac: e.macAddresses?.[0] ?? null,
+    serialNumber: e.serialNumber?.trim() || null,
+    online: e.online ?? null,
+    registeredAt: e.registeredAt ?? null,
+    lastSeenAt: e.lastSeenAt ?? null,
+    tamperProtection: e.tamperProtectionEnabled ?? null,
+  };
+}
+
+// GET /api/devices[?refresh=1]
 // Returns the devices enrolled in Sophos Central. Requires a signed-in user.
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -16,20 +48,13 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    const endpoints = await listEndpoints();
+  const refresh = new URL(request.url).searchParams.get("refresh") === "1";
+  if (!refresh && cache && Date.now() - cache.at < CACHE_MS) {
+    return NextResponse.json(cache.payload);
+  }
 
-    const devices = endpoints.map((e) => ({
-      id: e.id,
-      hostname: e.hostname,
-      type: e.type,
-      os: e.os?.name ?? e.os?.platform ?? "Unknown",
-      health: e.health?.overall ?? "unknown",
-      user: e.associatedPerson?.viaLogin ?? e.associatedPerson?.name ?? null,
-      ip: e.ipv4Addresses?.[0] ?? null,
-      lastSeenAt: e.lastSeenAt ?? null,
-      tamperProtection: e.tamperProtectionEnabled ?? null,
-    }));
+  try {
+    const devices = (await listEndpoints()).map(toDevice);
 
     const summary = devices.reduce(
       (acc, d) => {
@@ -40,7 +65,9 @@ export async function GET() {
       { total: 0, byHealth: {} as Record<string, number> }
     );
 
-    return NextResponse.json({ summary, devices, fetchedAt: new Date().toISOString() });
+    const payload: Payload = { summary, devices, fetchedAt: new Date().toISOString() };
+    cache = { at: Date.now(), payload };
+    return NextResponse.json(payload);
   } catch (err) {
     console.error(err);
     return NextResponse.json(

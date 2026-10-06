@@ -43,7 +43,10 @@ export const IconSun = ({ size }: { size?: number }) => (
 export const IconTrash = ({ size }: { size?: number }) => (
   <Svg size={size}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></Svg>
 );
-export const IconChevronLeft = ({ size }: { size?: number }) => (
+export const IconFilter = ({ size }: { size?: number }) => (
+  <Svg size={size}><path d="M3 5h18l-7 8v6l-4 2v-8L3 5z" /></Svg>
+);
+export const IconChevronLeft =({ size }: { size?: number }) => (
   <Svg size={size}><path d="M15 6l-6 6 6 6" /></Svg>
 );
 export const IconChevronRight = ({ size }: { size?: number }) => (
