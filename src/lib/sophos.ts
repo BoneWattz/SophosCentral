@@ -10,7 +10,7 @@ export interface SophosEndpoint {
   hostname: string;
   os?: { name?: string; platform?: string; isServer?: boolean };
   health?: { overall?: string };
-  associatedPerson?: { name?: string; viaLogin?: string };
+  associatedPerson?: { id?: string; name?: string; viaLogin?: string };
   ipv4Addresses?: string[];
   macAddresses?: string[];
   lastSeenAt?: string;

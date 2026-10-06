@@ -49,7 +49,7 @@ body {
   font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 0.93rem;
 }
-h1 { margin: 0; font-size: 1.6rem; font-weight: 700; }
+h1 { margin: 0; font-size: 1.35rem; font-weight: 700; }
 h2 { margin: 0; font-size: 1.05rem; }
 .muted { color: var(--muted); margin: 0; font-size: 0.88rem; }
 .error { color: var(--bad-text); margin: 0; font-size: 0.9rem; }
@@ -147,9 +147,9 @@ label { display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; }
 
 /* ---------- stat cards ---------- */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 20px; }
-.stat { padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
-.stat strong { font-size: 1.9rem; line-height: 1; }
-.stat .label { font-size: 0.8rem; color: var(--muted); text-transform: capitalize; }
+.stat { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.stat strong { font-size: 1.5rem; line-height: 1; }
+.stat .label { font-size: 0.72rem; color: var(--muted); text-transform: capitalize; }
 
 /* ---------- data table ---------- */
 .table-card { overflow: hidden; }
@@ -185,11 +185,22 @@ td.actions-cell { text-align: right; width: 1%; }
 
 /* ---------- licence summary ---------- */
 .license-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
-.license-hero { grid-column: span 2; padding: 18px 20px; display: flex; flex-direction: column; gap: 4px; border-left: 4px solid var(--accent); }
-.license-hero .label { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
-.license-hero strong { font-size: 2.6rem; line-height: 1.1; color: var(--accent-text); }
-.license-hero .license-unit { font-size: 0.85rem; color: var(--muted); }
-.license-hero p { margin-top: 8px; font-size: 0.78rem; line-height: 1.5; }
+.license-hero { grid-column: span 2; padding: 14px 18px; display: flex; flex-direction: column; gap: 4px; border-left: 4px solid var(--accent); }
+.license-hero .label { font-size: 0.72rem; color: var(--muted); font-weight: 600; }
+.license-hero strong { font-size: 2rem; line-height: 1.1; color: var(--accent-text); }
+.license-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.license-hero .license-unit { font-size: 0.78rem; color: var(--muted); }
+.license-hero p { margin-top: 6px; font-size: 0.7rem; line-height: 1.5; }
+.unit-badge {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-text); font-size: 0.68rem; font-weight: 600;
+}
+.stat-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.icon-chip { width: 30px; height: 30px; border-radius: 9px; display: inline-grid; place-items: center; flex-shrink: 0; }
+.icon-chip.ok { background: var(--accent-soft); color: var(--accent-text); }
+.icon-chip.bad { background: var(--bad-soft); color: var(--bad-text); }
+.icon-chip.warn { background: var(--warn-soft); color: var(--warn-text); }
+.icon-chip.neutral { background: var(--surface-2); color: var(--muted); }
 @media (max-width: 600px) { .license-hero { grid-column: auto; } }
 
 /* ---------- advanced filters ---------- */

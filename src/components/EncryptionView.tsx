@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import DataTable, { type Column, type FilterDef } from "./DataTable";
 import LicenseSummary from "./LicenseSummary";
+import { IconAlert, IconCheckCircle, IconLock, IconUser, IconXCircle } from "./icons";
 import { useDevices, type Device } from "@/lib/useDevices";
 import { useLicenses } from "@/lib/useLicenses";
 
@@ -53,6 +54,11 @@ export default function EncryptionView() {
   const license = licensesState.licenses.find((l) => l.code === "CDE-MSP");
 
   const count = (state: string) => devices.filter((d) => d.encryption.state === state).length;
+  const encryptedUsers = new Set(
+    devices
+      .filter((d) => ["encrypted", "partial", "encrypting", "suspended"].includes(d.encryption.state) && d.userId)
+      .map((d) => d.userId)
+  ).size;
 
   const filters = useMemo<FilterDef<Device>[]>(
     () => [
@@ -120,12 +126,22 @@ export default function EncryptionView() {
 
       <LicenseSummary
         title="Central Device Encryption"
+        icon={<IconLock size={18} />}
+        // Sophos doesn't label this product's billing unit; the licence count (1,100) sits much closer to
+        // distinct users (~1,250) than to devices (~1,470), so it is shown as per user. Change here if Sophos says otherwise.
+        unit="user"
         license={license}
         loading={licensesState.loading}
         stats={[
-          { label: "Fully encrypted", value: count("encrypted") },
-          { label: "Not encrypted", value: count("notEncrypted") },
-          { label: "Partial / suspended / encrypting", value: count("partial") + count("suspended") + count("encrypting") },
+          { label: "Fully encrypted", value: count("encrypted"), icon: <IconCheckCircle size={16} />, tone: "ok" },
+          { label: "Not encrypted", value: count("notEncrypted"), icon: <IconXCircle size={16} />, tone: "bad" },
+          {
+            label: "Partial / suspended / encrypting",
+            value: count("partial") + count("suspended") + count("encrypting"),
+            icon: <IconAlert size={16} />,
+            tone: "warn",
+          },
+          { label: "Distinct users encrypted", value: encryptedUsers, icon: <IconUser size={16} />, tone: "neutral" },
         ]}
       />
 

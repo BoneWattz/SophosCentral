@@ -51,6 +51,7 @@ function toDevice(e: Endpoint) {
     isServer: e.os?.isServer ?? false,
     health: e.health?.overall ?? "unknown",
     user: e.associatedPerson?.viaLogin ?? e.associatedPerson?.name ?? null,
+    userId: e.associatedPerson?.id ?? null,
     ip: e.ipv4Addresses?.[0] ?? null,
     mac: e.macAddresses?.[0] ?? null,
     serialNumber: e.serialNumber?.trim() || null,

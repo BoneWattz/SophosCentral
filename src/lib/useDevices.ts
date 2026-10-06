@@ -15,6 +15,7 @@ export interface Device {
   encryption: { state: string; volumes: number; component: string | null };
   health: string;
   user: string | null;
+  userId: string | null;
   ip: string | null;
   mac: string | null;
   serialNumber: string | null;

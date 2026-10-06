@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import DataTable, { type Column, type FilterDef } from "./DataTable";
 import LicenseSummary from "./LicenseSummary";
+import { IconCheckCircle, IconMonitor, IconShield, IconUser, IconXCircle } from "./icons";
 import { useDevices, type Device } from "@/lib/useDevices";
 import { useLicenses } from "@/lib/useLicenses";
 
@@ -44,6 +45,9 @@ export default function EndpointView() {
 
   const installed = devices.filter((d) => d.interceptX?.status === "installed").length;
   const notInstalled = devices.filter((d) => d.interceptX?.status !== "installed").length;
+  const distinctUsers = new Set(
+    devices.filter((d) => d.interceptX?.status === "installed" && d.userId).map((d) => d.userId)
+  ).size;
 
   const filters = useMemo<FilterDef<Device>[]>(
     () => [
@@ -109,12 +113,15 @@ export default function EndpointView() {
 
       <LicenseSummary
         title="Sophos Endpoint (Intercept X Advanced)"
+        icon={<IconShield size={18} />}
+        unit="user" // Product name is "Sophos Endpoint - User MSP Monthly"
         license={license}
         loading={licensesState.loading}
         stats={[
-          { label: "Devices with Intercept X", value: installed },
-          { label: "Not installed / unknown", value: notInstalled },
-          { label: "Total devices", value: devices.length },
+          { label: "Devices with Intercept X", value: installed, icon: <IconCheckCircle size={16} />, tone: "ok" },
+          { label: "Not installed / unknown", value: notInstalled, icon: <IconXCircle size={16} />, tone: "bad" },
+          { label: "Distinct users", value: distinctUsers, icon: <IconUser size={16} />, tone: "neutral" },
+          { label: "Total devices", value: devices.length, icon: <IconMonitor size={16} />, tone: "neutral" },
         ]}
       />
 
