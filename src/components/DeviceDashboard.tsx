@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import UsersPanel from "./UsersPanel";
 
 interface Device {
   id: string;
@@ -21,8 +22,9 @@ interface DevicesResponse {
   fetchedAt: string;
 }
 
-export default function DeviceDashboard({ email }: { email: string }) {
+export default function DeviceDashboard({ email, isAdmin }: { email: string; isAdmin: boolean }) {
   const router = useRouter();
+  const [showUsers, setShowUsers] = useState(false);
   const [data, setData] = useState<DevicesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,11 +79,18 @@ export default function DeviceDashboard({ email }: { email: string }) {
           <button onClick={load} disabled={loading}>
             {loading ? "Refreshing…" : "Refresh"}
           </button>
+          {isAdmin && (
+            <button className="secondary" onClick={() => setShowUsers((v) => !v)}>
+              {showUsers ? "Hide users" : "Manage users"}
+            </button>
+          )}
           <button className="secondary" onClick={logout}>
             Sign out
           </button>
         </div>
       </header>
+
+      {isAdmin && showUsers && <UsersPanel currentEmail={email} />}
 
       {error && <p className="error">{error}</p>}
 

@@ -3,25 +3,20 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
-type Mode = "login" | "register";
-
 export default function AuthForm() {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setMessage(null);
 
     try {
-      const res = await fetch(`/api/auth/${mode}`, {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -33,14 +28,8 @@ export default function AuthForm() {
         return;
       }
 
-      if (mode === "login") {
-        router.replace("/dashboard");
-        router.refresh();
-      } else {
-        setMessage(body.message);
-        setMode("login");
-        setPassword("");
-      }
+      router.replace("/dashboard");
+      router.refresh();
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -50,7 +39,7 @@ export default function AuthForm() {
 
   return (
     <form className="card auth" onSubmit={handleSubmit}>
-      <h1>{mode === "login" ? "Sign in" : "Create account"}</h1>
+      <h1>Sign in</h1>
       <p className="muted">Sophos Central device dashboard</p>
 
       <label>
@@ -68,8 +57,7 @@ export default function AuthForm() {
         Password
         <input
           type="password"
-          autoComplete={mode === "login" ? "current-password" : "new-password"}
-          minLength={8}
+          autoComplete="current-password"
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -77,23 +65,11 @@ export default function AuthForm() {
       </label>
 
       {error && <p className="error">{error}</p>}
-      {message && <p className="success">{message}</p>}
 
       <button type="submit" disabled={loading}>
-        {loading ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
+        {loading ? "Please wait…" : "Sign in"}
       </button>
-
-      <button
-        type="button"
-        className="link"
-        onClick={() => {
-          setMode(mode === "login" ? "register" : "login");
-          setError(null);
-          setMessage(null);
-        }}
-      >
-        {mode === "login" ? "Need an account? Register" : "Already have an account? Sign in"}
-      </button>
+      <p className="muted">Accounts are created by an administrator.</p>
     </form>
   );
 }

@@ -10,5 +10,5 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
-  return <DeviceDashboard email={user.email ?? ""} />;
+  return <DeviceDashboard email={user.email ?? ""} isAdmin={user.app_metadata?.role === "admin"} />;
 }
