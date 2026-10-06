@@ -39,13 +39,15 @@
 }
 
 * { box-sizing: border-box; }
+/* Root size drives every rem value in the app (16px default -> 15px, about 6% smaller). */
+html { font-size: 15px; }
 html, body { height: 100%; }
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
   font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-size: 15px;
+  font-size: 0.93rem;
 }
 h1 { margin: 0; font-size: 1.6rem; font-weight: 700; }
 h2 { margin: 0; font-size: 1.05rem; }
