@@ -10,6 +10,9 @@ export interface Device {
   os: string;
   platform: string;
   isServer: boolean;
+  interceptX: { status: string; version: string | null } | null;
+  // state: encrypted | partial | notEncrypted | encrypting | suspended | notSupported | unknown
+  encryption: { state: string; volumes: number; component: string | null };
   health: string;
   user: string | null;
   ip: string | null;

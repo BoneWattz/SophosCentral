@@ -18,6 +18,7 @@ export interface SophosEndpoint {
   serialNumber?: string;
   online?: boolean;
   tamperProtectionEnabled?: boolean;
+  encryption?: { volumes?: { volumeId: string; status: string }[] };
   assignedProducts?: { code: string; version?: string; status?: string }[];
 }
 
@@ -35,6 +36,8 @@ const ENDPOINT_FIELDS = [
   "registeredAt",
   "serialNumber",
   "online",
+  "assignedProducts",
+  "encryption",
 ].join(",");
 
 interface Session {
@@ -97,6 +100,58 @@ async function getSession(): Promise<Session> {
     apiHost: whoami.apiHosts.dataRegion,
   };
   return cached;
+}
+
+export interface SophosLicense {
+  id: string;
+  licenseIdentifier: string;
+  code: string;
+  genericCode: string | null;
+  name: string;
+  type: string;
+  unlimited: boolean;
+  startDate: string | null;
+  // Usage-based (MSP monthly) licences report licences in use, not a purchased quantity.
+  count: number;
+  asOf: string | null;
+}
+
+interface RawLicense {
+  id: string;
+  licenseIdentifier: string;
+  type: string;
+  unlimited?: boolean;
+  startDate?: string;
+  product: { code: string; genericCode?: string; name: string };
+  usage?: { current?: { count?: number; date?: string; collectedAt?: string } };
+}
+
+export async function listLicenses(): Promise<SophosLicense[]> {
+  const session = await getSession();
+  const res = await fetch("https://api.central.sophos.com/licenses/v1/licenses", {
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`,
+      "X-Tenant-ID": session.tenantId,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+  if (res.status === 401) cached = null;
+  if (!res.ok) throw new Error(`Sophos licenses request failed (${res.status})`);
+
+  const body = (await res.json()) as { licenses: RawLicense[] };
+  return body.licenses.map((l) => ({
+    id: l.id,
+    licenseIdentifier: l.licenseIdentifier,
+    code: l.product.code,
+    genericCode: l.product.genericCode ?? null,
+    name: l.product.name,
+    type: l.type,
+    unlimited: l.unlimited ?? false,
+    startDate: l.startDate ?? null,
+    count: l.usage?.current?.count ?? 0,
+    asOf: l.usage?.current?.collectedAt ?? l.usage?.current?.date ?? null,
+  }));
 }
 
 // Fetches every enrolled endpoint, following Sophos' key-based pagination.
