@@ -139,7 +139,7 @@ label { display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; }
   width: 100%; text-align: left; padding: 9px 10px; border: 0; background: transparent; color: var(--text); border-radius: 8px;
 }
 .menu button:hover { background: var(--surface-2); }
-.content { padding: 28px 28px 40px; max-width: 1400px; width: 100%; margin: 0 auto; }
+.content { padding: 28px 28px 40px; width: 100%; }
 .page-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-bottom: 18px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
 .page-head .actions { display: flex; gap: 8px; }
 
@@ -154,22 +154,29 @@ label { display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; }
 .table-toolbar { display: flex; gap: 10px; padding: 16px; }
 .table-toolbar input { flex: 1; }
 .table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
 th {
-  text-align: left; padding: 11px 16px; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase;
+  text-align: left; padding: 10px 14px; font-size: 0.68rem; letter-spacing: 0.05em; text-transform: uppercase;
   color: var(--muted); font-weight: 600; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); white-space: nowrap;
 }
-td { padding: 13px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 11px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 tbody tr:hover { background: var(--surface-2); }
 td.actions-cell { text-align: right; width: 1%; }
 .empty { text-align: center; color: var(--muted); padding: 32px 16px; }
 .table-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; flex-wrap: wrap; }
-.pager { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.88rem; }
+.foot-left { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; font-size: 0.82rem; }
+.per-page { flex-direction: row; align-items: center; gap: 8px; color: var(--muted); font-size: 0.82rem; }
+.per-page select { padding: 5px 8px; font-size: 0.82rem; }
+.pager { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 0.82rem; flex-wrap: wrap; }
 .pager button {
-  width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  min-width: 30px; height: 30px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); display: inline-grid; place-items: center; font-size: 0.82rem;
 }
-.pager button:disabled { color: var(--muted); }
-.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; text-transform: capitalize; background: var(--surface-2); color: var(--muted); }
+.pager button:hover:not(:disabled):not(.current) { background: var(--surface-2); }
+.pager button.current { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.pager button:disabled { color: var(--muted); opacity: 0.5; cursor: default; }
+.pager .gap { padding: 0 4px; }
+.badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; text-transform: capitalize; background: var(--surface-2); color: var(--muted); }
 .badge.good, .badge.admin { background: var(--ok-soft); color: var(--ok-text); }
 .badge.suspicious { background: var(--warn-soft); color: var(--warn-text); }
 .badge.bad { background: var(--bad-soft); color: var(--bad-text); }
@@ -201,8 +208,9 @@ td.actions-cell { text-align: right; width: 1%; }
   .table-toolbar { flex-direction: column; }
   .table-toolbar select { width: 100%; }
   .page-head h1 { font-size: 1.35rem; }
-  table { font-size: 0.82rem; }
-  th, td { padding-left: 10px; padding-right: 10px; }
+  table { font-size: 0.76rem; }
+  th, td { padding-left: 8px; padding-right: 8px; }
+  .foot-left { gap: 8px; }
 }
 
 @media (max-width: 800px) {

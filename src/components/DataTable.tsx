@@ -8,6 +8,20 @@ export interface Column<T> {
   render: (row: T) => ReactNode;
 }
 
+const PAGE_SIZES = [10, 25, 50, 100];
+
+// Page buttons to show: first, last, and a window around the current page, with "…" for gaps.
+function pageList(current: number, pages: number): (number | "…")[] {
+  const keep = new Set([1, pages, current - 1, current, current + 1]);
+  const nums = [...keep].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+  const out: (number | "…")[] = [];
+  nums.forEach((n, i) => {
+    if (i > 0 && n - nums[i - 1] > 1) out.push("…");
+    out.push(n);
+  });
+  return out;
+}
+
 // One dropdown in the advanced filter panel. A row passes when test(row, selectedValue) is true.
 export interface FilterDef<T> {
   key: string;
@@ -51,8 +65,9 @@ export default function DataTable<T>({
   actions,
   loading = false,
   emptyText = "No records found",
-  pageSize = 8,
+  pageSize: initialPageSize = 10,
 }: DataTableProps<T>) {
+  const [pageSize, setPageSize] = useState(initialPageSize);
   const [query, setQuery] = useState(initialQuery);
   const [filter, setFilter] = useState("");
   const [advanced, setAdvanced] = useState<Record<string, string>>({});
@@ -191,19 +206,60 @@ export default function DataTable<T>({
       </div>
 
       <div className="table-foot">
-        <span className="muted">
-          Showing {visible.length} of {filtered.length}
-          {filtered.length !== rows.length && ` (filtered from ${rows.length})`}
-        </span>
+        <div className="foot-left">
+          <label className="per-page">
+            Rows per page
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(1);
+              }}
+            >
+              {PAGE_SIZES.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+          <span className="muted">
+            {filtered.length === 0
+              ? "Showing 0 of 0"
+              : `Showing ${(current - 1) * pageSize + 1}–${(current - 1) * pageSize + visible.length} of ${filtered.length}`}
+            {filtered.length !== rows.length && ` (filtered from ${rows.length})`}
+          </span>
+        </div>
+
         <div className="pager">
+          <button disabled={current <= 1} onClick={() => setPage(1)} aria-label="First page" title="First page">
+            «
+          </button>
           <button disabled={current <= 1} onClick={() => setPage(current - 1)} aria-label="Previous page">
             <IconChevronLeft size={14} />
           </button>
-          <span>
-            Page {current} of {pages}
-          </span>
+          {pageList(current, pages).map((p, i) =>
+            p === "…" ? (
+              <span key={`gap-${i}`} className="gap">
+                …
+              </span>
+            ) : (
+              <button
+                key={p}
+                className={p === current ? "current" : ""}
+                onClick={() => setPage(p)}
+                aria-label={`Page ${p}`}
+                aria-current={p === current ? "page" : undefined}
+              >
+                {p}
+              </button>
+            )
+          )}
           <button disabled={current >= pages} onClick={() => setPage(current + 1)} aria-label="Next page">
             <IconChevronRight size={14} />
+          </button>
+          <button disabled={current >= pages} onClick={() => setPage(pages)} aria-label="Last page" title="Last page">
+            »
           </button>
         </div>
       </div>
