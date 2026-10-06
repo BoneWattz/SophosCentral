@@ -7,27 +7,30 @@ import { useDevices, type Device } from "@/lib/useDevices";
 const DAY = 24 * 60 * 60 * 1000;
 
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
+const timestamp = (iso: string | null) => (iso ? new Date(iso).getTime() : null);
 
 const columns: Column<Device>[] = [
-  { header: "Hostname", render: (d) => d.hostname },
-  { header: "Serial number", render: (d) => d.serialNumber ?? "—" },
-  { header: "Type", render: (d) => d.type },
-  { header: "OS", render: (d) => d.os },
-  { header: "User", render: (d) => d.user ?? "—" },
-  { header: "IP", render: (d) => d.ip ?? "—" },
-  { header: "MAC", render: (d) => d.mac ?? "—" },
+  { header: "Hostname", render: (d) => d.hostname, sort: (d) => d.hostname },
+  { header: "Serial number", render: (d) => d.serialNumber ?? "—", sort: (d) => d.serialNumber },
+  { header: "Type", render: (d) => d.type, sort: (d) => d.type },
+  { header: "OS", render: (d) => d.os, sort: (d) => d.os },
+  { header: "User", render: (d) => d.user ?? "—", sort: (d) => d.user },
+  { header: "IP", render: (d) => d.ip ?? "—", sort: (d) => d.ip },
+  { header: "MAC", render: (d) => d.mac ?? "—", sort: (d) => d.mac },
   {
     header: "Online",
     render: (d) =>
       d.online === null ? "—" : <span className={`badge ${d.online ? "good" : ""}`}>{d.online ? "Online" : "Offline"}</span>,
+    sort: (d) => d.online,
   },
   {
     header: "Tamper",
     render: (d) => (d.tamperProtection === null ? "—" : d.tamperProtection ? "On" : "Off"),
+    sort: (d) => d.tamperProtection,
   },
-  { header: "Registered", render: (d) => fmtDate(d.registeredAt) },
-  { header: "Last seen", render: (d) => fmtDate(d.lastSeenAt) },
-  { header: "Status", render: (d) => <span className={`badge ${d.health}`}>{d.health}</span> },
+  { header: "Registered", render: (d) => fmtDate(d.registeredAt), sort: (d) => timestamp(d.registeredAt) },
+  { header: "Last seen", render: (d) => fmtDate(d.lastSeenAt), sort: (d) => timestamp(d.lastSeenAt) },
+  { header: "Status", render: (d) => <span className={`badge ${d.health}`}>{d.health}</span>, sort: (d) => d.health },
 ];
 
 const searchText = (d: Device) =>

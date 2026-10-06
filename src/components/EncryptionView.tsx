@@ -27,21 +27,27 @@ const STATE_CLASS: Record<string, string> = {
 const stateLabel = (s: string) => STATE_LABEL[s] ?? s;
 
 const columns: Column<Device>[] = [
-  { header: "Hostname", render: (d) => d.hostname },
-  { header: "Serial number", render: (d) => d.serialNumber ?? "—" },
-  { header: "OS", render: (d) => d.os },
-  { header: "User", render: (d) => d.user ?? "—" },
-  { header: "Volumes", render: (d) => d.encryption.volumes },
+  { header: "Hostname", render: (d) => d.hostname, sort: (d) => d.hostname },
+  { header: "Serial number", render: (d) => d.serialNumber ?? "—", sort: (d) => d.serialNumber },
+  { header: "OS", render: (d) => d.os, sort: (d) => d.os },
+  { header: "User", render: (d) => d.user ?? "—", sort: (d) => d.user },
+  { header: "Volumes", render: (d) => d.encryption.volumes, sort: (d) => d.encryption.volumes },
   {
     header: "Encryption",
     render: (d) => <span className={`badge ${STATE_CLASS[d.encryption.state] ?? ""}`}>{stateLabel(d.encryption.state)}</span>,
+    sort: (d) => stateLabel(d.encryption.state),
   },
   {
     header: "Component",
     render: (d) =>
       d.encryption.component === "installed" ? "Installed" : d.encryption.component === "notInstalled" ? "Not installed" : "—",
+    sort: (d) => d.encryption.component,
   },
-  { header: "Last seen", render: (d) => (d.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString() : "—") },
+  {
+    header: "Last seen",
+    render: (d) => (d.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString() : "—"),
+    sort: (d) => (d.lastSeenAt ? new Date(d.lastSeenAt).getTime() : null),
+  },
 ];
 
 const searchText = (d: Device) =>
@@ -127,9 +133,8 @@ export default function EncryptionView() {
       <LicenseSummary
         title="Central Device Encryption"
         icon={<IconLock size={18} />}
-        // Sophos doesn't label this product's billing unit; the licence count (1,100) sits much closer to
-        // distinct users (~1,250) than to devices (~1,470), so it is shown as per user. Change here if Sophos says otherwise.
-        unit="user"
+        // Sophos' API doesn't label this product's billing unit; confirmed per device by the account owner.
+        unit="device"
         license={license}
         loading={licensesState.loading}
         stats={[

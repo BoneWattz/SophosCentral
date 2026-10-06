@@ -161,6 +161,14 @@ th {
   text-align: left; padding: 10px 14px; font-size: 0.68rem; letter-spacing: 0.05em; text-transform: uppercase;
   color: var(--muted); font-weight: 600; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); white-space: nowrap;
 }
+.sort-btn {
+  display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: none;
+  color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer;
+}
+.sort-btn svg { opacity: 0.4; }
+.sort-btn:hover svg { opacity: 0.8; }
+.sort-btn.active { color: var(--accent-text); }
+.sort-btn.active svg { opacity: 1; }
 td { padding: 11px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 tbody tr:hover { background: var(--surface-2); }
 td.actions-cell { text-align: right; width: 1%; }
@@ -185,7 +193,7 @@ td.actions-cell { text-align: right; width: 1%; }
 
 /* ---------- licence summary ---------- */
 .license-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
-.license-hero { grid-column: span 2; padding: 14px 18px; display: flex; flex-direction: column; gap: 4px; border-left: 4px solid var(--accent); }
+.license-hero { grid-column: span 2; padding: 14px 18px; display: flex; flex-direction: column; gap: 4px; }
 .license-hero .label { font-size: 0.72rem; color: var(--muted); font-weight: 600; }
 .license-hero strong { font-size: 2rem; line-height: 1.1; color: var(--accent-text); }
 .license-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

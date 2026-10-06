@@ -1,11 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { IconChevronLeft, IconChevronRight, IconFilter } from "./icons";
+import { IconArrowDown, IconArrowUp, IconChevronLeft, IconChevronRight, IconFilter, IconSort } from "./icons";
 
 export interface Column<T> {
   header: string;
   render: (row: T) => ReactNode;
+  // Makes the column sortable. Return the value to sort by (empty values always sort last).
+  sort?: (row: T) => string | number | boolean | null | undefined;
+}
+
+type SortDir = "asc" | "desc";
+
+function compareValues(a: string | number | boolean, b: string | number | boolean) {
+  if (typeof a !== "string" && typeof b !== "string") return Number(a) - Number(b);
+  // numeric: true so "host-2" < "host-10" and 192.168.0.9 < 192.168.0.10
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
 }
 
 const PAGE_SIZES = [10, 25, 50, 100];
@@ -73,6 +83,8 @@ export default function DataTable<T>({
   const [advanced, setAdvanced] = useState<Record<string, string>>({});
   const [panelOpen, setPanelOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   // The top-bar search can change ?q= while this table stays mounted.
   useEffect(() => setQuery(initialQuery), [initialQuery]);
@@ -90,9 +102,37 @@ export default function DataTable<T>({
     );
   }, [rows, query, filter, filterOf, searchText, filters, advanced]);
 
-  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const sorted = useMemo(() => {
+    const col = columns.find((c) => c.header === sortBy);
+    if (!col?.sort) return filtered;
+    const get = col.sort;
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((x, y) => {
+      const a = get(x);
+      const b = get(y);
+      const aEmpty = a === null || a === undefined || a === "";
+      const bEmpty = b === null || b === undefined || b === "";
+      if (aEmpty || bEmpty) return aEmpty === bEmpty ? 0 : aEmpty ? 1 : -1; // empties last, either direction
+      return compareValues(a, b) * dir;
+    });
+  }, [filtered, columns, sortBy, sortDir]);
+
+  // Click a header: ascending, then descending, then back to the original order.
+  function toggleSort(header: string) {
+    if (sortBy !== header) {
+      setSortBy(header);
+      setSortDir("asc");
+    } else if (sortDir === "asc") {
+      setSortDir("desc");
+    } else {
+      setSortBy(null);
+    }
+    setPage(1);
+  }
+
+  const pages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const current = Math.min(page, pages);
-  const visible = filtered.slice((current - 1) * pageSize, current * pageSize);
+  const visible = sorted.slice((current - 1) * pageSize, current * pageSize);
 
   function setAdvancedValue(key: string, value: string) {
     setAdvanced((a) => ({ ...a, [key]: value }));
@@ -179,9 +219,29 @@ export default function DataTable<T>({
         <table>
           <thead>
             <tr>
-              {columns.map((c) => (
-                <th key={c.header}>{c.header}</th>
-              ))}
+              {columns.map((c) => {
+                const active = sortBy === c.header;
+                return (
+                  <th
+                    key={c.header}
+                    aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : undefined}
+                  >
+                    {c.sort ? (
+                      <button
+                        type="button"
+                        className={`sort-btn${active ? " active" : ""}`}
+                        onClick={() => toggleSort(c.header)}
+                        title={`Sort by ${c.header}`}
+                      >
+                        {c.header}
+                        {active ? sortDir === "asc" ? <IconArrowUp size={12} /> : <IconArrowDown size={12} /> : <IconSort size={12} />}
+                      </button>
+                    ) : (
+                      c.header
+                    )}
+                  </th>
+                );
+              })}
               {actions && <th />}
             </tr>
           </thead>

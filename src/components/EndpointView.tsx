@@ -13,23 +13,29 @@ const installClass = (status: string | undefined) =>
   status === "installed" ? "good" : status === "notInstalled" ? "bad" : "";
 
 const columns: Column<Device>[] = [
-  { header: "Hostname", render: (d) => d.hostname },
-  { header: "OS", render: (d) => d.os },
-  { header: "User", render: (d) => d.user ?? "—" },
-  { header: "Intercept X version", render: (d) => d.interceptX?.version ?? "—" },
+  { header: "Hostname", render: (d) => d.hostname, sort: (d) => d.hostname },
+  { header: "OS", render: (d) => d.os, sort: (d) => d.os },
+  { header: "User", render: (d) => d.user ?? "—", sort: (d) => d.user },
+  { header: "Intercept X version", render: (d) => d.interceptX?.version ?? "—", sort: (d) => d.interceptX?.version },
   {
     header: "Intercept X",
     render: (d) => (
       <span className={`badge ${installClass(d.interceptX?.status)}`}>{installLabel(d.interceptX?.status)}</span>
     ),
+    sort: (d) => installLabel(d.interceptX?.status),
   },
-  { header: "Health", render: (d) => <span className={`badge ${d.health}`}>{d.health}</span> },
+  { header: "Health", render: (d) => <span className={`badge ${d.health}`}>{d.health}</span>, sort: (d) => d.health },
   {
     header: "Online",
     render: (d) =>
       d.online === null ? "—" : <span className={`badge ${d.online ? "good" : ""}`}>{d.online ? "Online" : "Offline"}</span>,
+    sort: (d) => d.online,
   },
-  { header: "Last seen", render: (d) => (d.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString() : "—") },
+  {
+    header: "Last seen",
+    render: (d) => (d.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString() : "—"),
+    sort: (d) => (d.lastSeenAt ? new Date(d.lastSeenAt).getTime() : null),
+  },
 ];
 
 const searchText = (d: Device) =>

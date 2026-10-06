@@ -55,10 +55,18 @@ export default function UsersView({ currentEmail }: { currentEmail: string }) {
   }
 
   const columns: Column<UserRow>[] = [
-    { header: "Email", render: (u) => u.email },
-    { header: "Role", render: (u) => <span className={`badge ${u.role}`}>{u.role}</span> },
-    { header: "Created", render: (u) => new Date(u.createdAt).toLocaleDateString() },
-    { header: "Last sign-in", render: (u) => (u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleString() : "Never") },
+    { header: "Email", render: (u) => u.email, sort: (u) => u.email },
+    { header: "Role", render: (u) => <span className={`badge ${u.role}`}>{u.role}</span>, sort: (u) => u.role },
+    {
+      header: "Created",
+      render: (u) => new Date(u.createdAt).toLocaleDateString(),
+      sort: (u) => new Date(u.createdAt).getTime(),
+    },
+    {
+      header: "Last sign-in",
+      render: (u) => (u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleString() : "Never"),
+      sort: (u) => (u.lastSignInAt ? new Date(u.lastSignInAt).getTime() : null),
+    },
   ];
 
   return (

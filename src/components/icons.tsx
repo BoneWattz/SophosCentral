@@ -43,7 +43,16 @@ export const IconSun = ({ size }: { size?: number }) => (
 export const IconTrash = ({ size }: { size?: number }) => (
   <Svg size={size}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></Svg>
 );
-export const IconServer = ({ size }: { size?: number }) => (
+export const IconArrowUp = ({ size }: { size?: number }) => (
+  <Svg size={size}><path d="M12 19V5M5 12l7-7 7 7" /></Svg>
+);
+export const IconArrowDown = ({ size }: { size?: number }) => (
+  <Svg size={size}><path d="M12 5v14M19 12l-7 7-7-7" /></Svg>
+);
+export const IconSort = ({ size }: { size?: number }) => (
+  <Svg size={size}><path d="M8 4v16M4 8l4-4 4 4M16 20V4M12 16l4 4 4-4" /></Svg>
+);
+export const IconServer =({ size }: { size?: number }) => (
   <Svg size={size}><rect x="3" y="4" width="18" height="7" rx="2" /><rect x="3" y="13" width="18" height="7" rx="2" /><path d="M7 7.5h.01M7 16.5h.01" /></Svg>
 );
 export const IconUser =({ size }: { size?: number }) => (
