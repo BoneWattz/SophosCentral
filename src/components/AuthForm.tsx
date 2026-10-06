@@ -66,7 +66,7 @@ export default function AuthForm() {
 
       {error && <p className="error">{error}</p>}
 
-      <button type="submit" disabled={loading}>
+      <button type="submit" className="btn" disabled={loading}>
         {loading ? "Please wait…" : "Sign in"}
       </button>
       <p className="muted">Accounts are created by an administrator.</p>
