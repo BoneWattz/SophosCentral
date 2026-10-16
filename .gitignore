@@ -6,3 +6,7 @@ out/
 .env.*.local
 *.tsbuildinfo
 next-env.d.ts
+
+# Employee/HC data exports must never be committed
+*.csv
+*.xlsx

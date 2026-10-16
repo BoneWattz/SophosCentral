@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "seed-admin": "node --env-file=.env.local scripts/seed-admin.mjs"
+    "seed-admin": "node --env-file=.env.local scripts/seed-admin.mjs",
+    "import-hc": "node --env-file=.env.local scripts/import-hc.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

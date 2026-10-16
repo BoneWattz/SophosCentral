@@ -43,7 +43,10 @@ export const IconSun = ({ size }: { size?: number }) => (
 export const IconTrash = ({ size }: { size?: number }) => (
   <Svg size={size}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></Svg>
 );
-export const IconArrowUp = ({ size }: { size?: number }) => (
+export const IconIdCard = ({ size }: { size?: number }) => (
+  <Svg size={size}><rect x="2.5" y="5" width="19" height="14" rx="2" /><circle cx="8.5" cy="11" r="2" /><path d="M5.5 16c.5-1.6 1.6-2.4 3-2.4s2.5.8 3 2.4M14 10h5M14 13.5h4" /></Svg>
+);
+export const IconArrowUp =({ size }: { size?: number }) => (
   <Svg size={size}><path d="M12 19V5M5 12l7-7 7 7" /></Svg>
 );
 export const IconArrowDown = ({ size }: { size?: number }) => (

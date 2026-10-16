@@ -1,5 +1,5 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "./server";
+import { createClient, isAllowedEmail } from "./server";
 
 // Service-role client: bypasses RLS and can manage auth users.
 // Server-side only. SUPABASE_SERVICE_ROLE_KEY must never reach the browser.
@@ -10,6 +10,16 @@ export function createAdminClient() {
   return createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+}
+
+// Returns the signed-in user if their email is on the allowed domain (any role).
+export async function getSessionUser() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  return user && isAllowedEmail(user.email) ? user : null;
 }
 
 // Returns the signed-in user if (and only if) they are an admin.

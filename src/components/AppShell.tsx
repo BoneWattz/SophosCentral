@@ -7,6 +7,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconGrid,
+  IconIdCard,
   IconLock,
   IconMonitor,
   IconMoon,
@@ -96,6 +97,7 @@ export default function AppShell({
 
         <div className="nav-section">GENERAL</div>
         {link("/dashboard/devices", "Devices", <IconMonitor />)}
+        {link("/dashboard/hc", "HC", <IconIdCard />)}
 
         <div className="nav-section">PRODUCTS</div>
         {link("/dashboard/endpoint", "Sophos Endpoint", <IconShield />)}
