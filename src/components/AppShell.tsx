@@ -98,7 +98,7 @@ export default function AppShell({
         <div className="nav-section">GENERAL</div>
         {link("/dashboard/devices", "Devices", <IconMonitor />)}
         {link("/dashboard/hc", "HC", <IconIdCard />)}
-        {link("/dashboard/sophos", "Sophos Users & Groups", <IconUsers />)}
+        {link("/dashboard/sophos", "Users & Groups", <IconUsers />)}
 
         <div className="nav-section">PRODUCTS</div>
         {link("/dashboard/endpoint", "Sophos Endpoint", <IconShield />)}

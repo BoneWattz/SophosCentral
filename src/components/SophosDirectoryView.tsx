@@ -86,7 +86,7 @@ export default function SophosDirectoryView({ initialTab }: { initialTab: Tab })
     <>
       <div className="page-head">
         <div>
-          <h1>Sophos Users &amp; Groups</h1>
+          <h1>Users &amp; Groups</h1>
           <p className="muted">{active.blurb} · newest first</p>
         </div>
         <div className="actions">

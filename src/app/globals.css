@@ -112,6 +112,8 @@ label { display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; }
   display: flex; align-items: center; gap: 11px; padding: 9px 10px; border-radius: 9px;
   color: var(--muted); text-decoration: none; font-weight: 500; font-size: 0.92rem; white-space: nowrap;
 }
+/* Icons keep their size even when a label is long enough to squeeze the row. */
+.nav-link svg { flex-shrink: 0; }
 .nav-link:hover { background: var(--surface-2); color: var(--text); }
 .nav-link.active { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
 .shell.collapsed .sidebar { width: 66px; }

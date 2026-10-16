@@ -182,16 +182,26 @@ export async function getDirectoryPage<T = Record<string, unknown>>(q: Directory
   url.searchParams.set("page", String(q.page));
   url.searchParams.set("pageSize", String(q.pageSize));
   url.searchParams.set("sort", q.sort);
-  if (q.search) url.searchParams.set("search", q.search);
+  if (q.search) {
+    url.searchParams.set("search", q.search);
+    // Without searchFields Sophos only searches names. Groups reject the parameter (HTTP 400).
+    if (q.kind === "users") url.searchParams.set("searchFields", "name,email");
+  }
 
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${session.accessToken}`,
-      "X-Tenant-ID": session.tenantId,
-      Accept: "application/json",
-    },
-    cache: "no-store",
-  });
+  // Sophos occasionally answers 5xx/429 for a request that works a moment later, so retry briefly.
+  let res!: Response;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${session.accessToken}`,
+        "X-Tenant-ID": session.tenantId,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+    if (res.status < 500 && res.status !== 429) break;
+    await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+  }
   if (res.status === 401) cached = null;
   if (!res.ok) throw new Error(`Sophos directory request failed (${res.status})`);
 
