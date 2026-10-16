@@ -154,6 +154,59 @@ export async function listLicenses(): Promise<SophosLicense[]> {
   }));
 }
 
+export type DirectoryKind = "users" | "groups";
+
+export interface DirectoryQuery {
+  kind: DirectoryKind;
+  page: number;
+  pageSize: number; // Sophos caps this at 100
+  sort: string; // e.g. "createdAt:desc"
+  search?: string;
+}
+
+export interface DirectoryPage<T> {
+  items: T[];
+  page: number;
+  pages: number;
+  total: number;
+}
+
+// One page of the Sophos Central directory (synced users or user groups).
+// Sophos sorts, searches and pages server-side, so we never need to download all ~4,500 users.
+export async function getDirectoryPage<T = Record<string, unknown>>(q: DirectoryQuery): Promise<DirectoryPage<T>> {
+  const session = await getSession();
+  const url = new URL(
+    `${session.apiHost}/common/v1/directory/${q.kind === "users" ? "users" : "user-groups"}`
+  );
+  url.searchParams.set("pageTotal", "true"); // required for page-number paging
+  url.searchParams.set("page", String(q.page));
+  url.searchParams.set("pageSize", String(q.pageSize));
+  url.searchParams.set("sort", q.sort);
+  if (q.search) url.searchParams.set("search", q.search);
+
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`,
+      "X-Tenant-ID": session.tenantId,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+  if (res.status === 401) cached = null;
+  if (!res.ok) throw new Error(`Sophos directory request failed (${res.status})`);
+
+  const body = (await res.json()) as {
+    items: T[];
+    pages?: { current?: number; total?: number; items?: number };
+  };
+  return {
+    items: body.items,
+    page: body.pages?.current ?? q.page,
+    pages: body.pages?.total ?? 1,
+    total: body.pages?.items ?? body.items.length,
+  };
+}
+
 // Fetches every enrolled endpoint, following Sophos' key-based pagination.
 export async function listEndpoints(): Promise<SophosEndpoint[]> {
   const session = await getSession();

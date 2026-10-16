@@ -14,6 +14,7 @@ import {
   IconSearch,
   IconShield,
   IconSun,
+  IconUser,
   IconUsers,
 } from "./icons";
 
@@ -98,6 +99,8 @@ export default function AppShell({
         <div className="nav-section">GENERAL</div>
         {link("/dashboard/devices", "Devices", <IconMonitor />)}
         {link("/dashboard/hc", "HC", <IconIdCard />)}
+        {link("/dashboard/sophos-users", "Sophos Users", <IconUser />)}
+        {link("/dashboard/sophos-groups", "Sophos Groups", <IconUsers />)}
 
         <div className="nav-section">PRODUCTS</div>
         {link("/dashboard/endpoint", "Sophos Endpoint", <IconShield />)}

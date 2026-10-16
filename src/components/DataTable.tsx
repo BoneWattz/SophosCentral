@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { PAGE_SIZES, pageList } from "@/lib/pageList";
 import { IconArrowDown, IconArrowUp, IconChevronLeft, IconChevronRight, IconFilter, IconSort } from "./icons";
 
 export interface Column<T> {
@@ -16,20 +17,6 @@ function compareValues(a: string | number | boolean, b: string | number | boolea
   if (typeof a !== "string" && typeof b !== "string") return Number(a) - Number(b);
   // numeric: true so "host-2" < "host-10" and 192.168.0.9 < 192.168.0.10
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
-}
-
-const PAGE_SIZES = [10, 25, 50, 100];
-
-// Page buttons to show: first, last, and a window around the current page, with "…" for gaps.
-function pageList(current: number, pages: number): (number | "…")[] {
-  const keep = new Set([1, pages, current - 1, current, current + 1]);
-  const nums = [...keep].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
-  const out: (number | "…")[] = [];
-  nums.forEach((n, i) => {
-    if (i > 0 && n - nums[i - 1] > 1) out.push("…");
-    out.push(n);
-  });
-  return out;
 }
 
 // One dropdown in the advanced filter panel. A row passes when test(row, selectedValue) is true.
