@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { PAGE_SIZES, pageList } from "@/lib/pageList";
-import { IconArrowDown, IconArrowUp, IconChevronLeft, IconChevronRight, IconFilter, IconSort } from "./icons";
+import {
+  IconArrowDown,
+  IconArrowUp,
+  IconChevronLeft,
+  IconChevronRight,
+  IconDownload,
+  IconFilter,
+  IconSort,
+} from "./icons";
 
 export interface Column<T> {
   header: string;
@@ -27,6 +35,16 @@ export interface FilterDef<T> {
   test: (row: T, value: string) => boolean;
 }
 
+type ExportValue = string | number | boolean | Date | null | undefined;
+
+// Adds an "Export Excel" button that downloads every row matching the current search, filters and sort.
+export interface ExportConfig<T> {
+  fileName: string; // without extension; today's date is appended
+  columns: { header: string; value: (row: T) => ExportValue; width?: number }[];
+  // Set while the export data isn't complete yet (e.g. still loading emails).
+  disabledReason?: string;
+}
+
 interface DataTableProps<T> {
   columns: Column<T>[];
   rows: T[];
@@ -41,6 +59,7 @@ interface DataTableProps<T> {
   filterLabel?: string;
   // Advanced filter panel, toggled with the Filters button.
   filters?: FilterDef<T>[];
+  exportConfig?: ExportConfig<T>;
   // Trailing cell, e.g. edit/delete buttons.
   actions?: (row: T) => ReactNode;
   loading?: boolean;
@@ -59,6 +78,7 @@ export default function DataTable<T>({
   filterOptions = [],
   filterLabel = "All",
   filters = [],
+  exportConfig,
   actions,
   loading = false,
   emptyText = "No records found",
@@ -103,6 +123,36 @@ export default function DataTable<T>({
       return compareValues(a, b) * dir;
     });
   }, [filtered, columns, sortBy, sortDir]);
+
+  const [exporting, setExporting] = useState(false);
+
+  async function exportExcel() {
+    if (!exportConfig || exporting) return;
+    setExporting(true);
+    try {
+      // Loaded on demand so the Excel library isn't part of the page's initial download.
+      const { default: writeXlsxFile } = await import("write-excel-file/browser");
+      const cell = (v: ExportValue) => {
+        if (v === null || v === undefined || v === "") return null;
+        if (v instanceof Date) return { value: v, format: "yyyy-mm-dd hh:mm" };
+        return v;
+      };
+      const sheetData = [
+        exportConfig.columns.map((c) => ({ value: c.header, fontWeight: "bold" as const })),
+        ...sorted.map((row) => exportConfig.columns.map((c) => cell(c.value(row)))),
+      ];
+      const day = new Date().toISOString().slice(0, 10);
+      await writeXlsxFile(sheetData, {
+        columns: exportConfig.columns.map((c) => ({ width: c.width ?? 18 })),
+        stickyRowsCount: 1,
+      }).toFile(`${exportConfig.fileName}-${day}.xlsx`);
+    } catch (err) {
+      console.error(err);
+      alert("Couldn't create the Excel file. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   // Click a header: ascending, then descending, then back to the original order.
   function toggleSort(header: string) {
@@ -172,6 +222,18 @@ export default function DataTable<T>({
             <IconFilter size={16} />
             Filters
             {activeFilters > 0 && <span className="count">{activeFilters}</span>}
+          </button>
+        )}
+        {exportConfig && (
+          <button
+            type="button"
+            className="btn secondary filter-btn"
+            onClick={exportExcel}
+            disabled={exporting || !!exportConfig.disabledReason || sorted.length === 0}
+            title={exportConfig.disabledReason ?? `Download ${sorted.length.toLocaleString()} rows as an Excel file`}
+          >
+            <IconDownload size={16} />
+            {exporting ? "Exporting…" : "Export Excel"}
           </button>
         )}
       </div>

@@ -1,25 +1,22 @@
 import { NextResponse } from "next/server";
 import { createClient, isAllowedEmail } from "@/lib/supabase/server";
-import { listEndpoints } from "@/lib/sophos";
+import { getEndpointsPage, type SophosEndpoint } from "@/lib/sophos";
 
 export const dynamic = "force-dynamic";
 
 const CACHE_MS = 2 * 60_000;
 
-interface Payload {
-  summary: { total: number; byHealth: Record<string, number> };
+interface PagePayload {
   devices: ReturnType<typeof toDevice>[];
-  fetchedAt: string;
+  nextKey: string | null;
 }
 
-// Sophos takes a few seconds per 500 devices, so reuse the last result for a couple
-// of minutes. Every caller is already authorised to see the same tenant data.
-let cache: { at: number; payload: Payload } | null = null;
-
-type Endpoint = Awaited<ReturnType<typeof listEndpoints>>[number];
+// Sophos takes a few seconds per 500 devices, so reuse each page for a couple of minutes.
+// Every caller is already authorised to see the same tenant data.
+const cache = new Map<string, { at: number; payload: PagePayload }>();
 
 // Collapses per-volume encryption statuses into one state for the device.
-function encryptionState(e: Endpoint): { state: string; volumes: number } {
+function encryptionState(e: SophosEndpoint): { state: string; volumes: number } {
   const statuses = (e.encryption?.volumes ?? []).map((v) => v.status);
   const volumes = statuses.length;
   if (volumes === 0) return { state: "unknown", volumes };
@@ -33,7 +30,7 @@ function encryptionState(e: Endpoint): { state: string; volumes: number } {
   return { state: "notEncrypted", volumes };
 }
 
-function toDevice(e: Endpoint) {
+function toDevice(e: SophosEndpoint) {
   const product = (code: string) => e.assignedProducts?.find((p) => p.code === code);
   const interceptX = product("interceptX") ?? product("endpointProtection");
   const encryptionComponent = product("deviceEncryption");
@@ -62,8 +59,9 @@ function toDevice(e: Endpoint) {
   };
 }
 
-// GET /api/devices[?refresh=1]
-// Returns the devices enrolled in Sophos Central. Requires a signed-in user.
+// GET /api/devices[?pageFromKey=<key>][&refresh=1]
+// One chunk (up to 500) of the devices enrolled in Sophos Central, plus `nextKey` for the following
+// chunk (null on the last one). The browser keeps asking until nextKey is null. Requires a signed-in user.
 export async function GET(request: Request) {
   const supabase = await createClient();
   const {
@@ -74,25 +72,22 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const refresh = new URL(request.url).searchParams.get("refresh") === "1";
-  if (!refresh && cache && Date.now() - cache.at < CACHE_MS) {
-    return NextResponse.json(cache.payload);
+  const params = new URL(request.url).searchParams;
+  const pageFromKey = params.get("pageFromKey") || undefined;
+  if (pageFromKey && pageFromKey.length > 2000) {
+    return NextResponse.json({ error: "Invalid page key" }, { status: 400 });
   }
+  const refresh = params.get("refresh") === "1";
+
+  const key = pageFromKey ?? "";
+  const hit = refresh ? undefined : cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_MS) return NextResponse.json(hit.payload);
 
   try {
-    const devices = (await listEndpoints()).map(toDevice);
-
-    const summary = devices.reduce(
-      (acc, d) => {
-        acc.total++;
-        acc.byHealth[d.health] = (acc.byHealth[d.health] ?? 0) + 1;
-        return acc;
-      },
-      { total: 0, byHealth: {} as Record<string, number> }
-    );
-
-    const payload: Payload = { summary, devices, fetchedAt: new Date().toISOString() };
-    cache = { at: Date.now(), payload };
+    const page = await getEndpointsPage(pageFromKey);
+    const payload: PagePayload = { devices: page.items.map(toDevice), nextKey: page.nextKey };
+    if (cache.size > 50) cache.clear();
+    cache.set(key, { at: Date.now(), payload });
     return NextResponse.json(payload);
   } catch (err) {
     console.error(err);

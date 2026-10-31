@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export interface Device {
@@ -38,23 +38,41 @@ export function useDevices() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // `force` bypasses the server's short-lived cache (used by the Refresh button).
+  // Only the latest load may update state (e.g. Refresh clicked while an earlier load is running).
+  const run = useRef(0);
+
+  // The API returns up to 500 devices per request (Sophos pages by key), so keep asking for the next
+  // chunk until there isn't one. `force` bypasses the server's short-lived cache (the Refresh button).
   const load = useCallback(async (force = false) => {
+    const mine = ++run.current;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(force ? "/api/devices?refresh=1" : "/api/devices", { cache: "no-store" });
-      if (res.status === 401) {
-        router.replace("/login");
-        return;
-      }
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Failed to load devices");
-      setData(body);
+      const devices: Device[] = [];
+      let nextKey: string | null = null;
+      do {
+        const qs = new URLSearchParams();
+        if (nextKey) qs.set("pageFromKey", nextKey);
+        if (force) qs.set("refresh", "1");
+        const res: Response = await fetch(`/api/devices${qs.size ? `?${qs}` : ""}`, { cache: "no-store" });
+        if (mine !== run.current) return;
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        const body = await res.json().catch(() => ({ error: `Server error (HTTP ${res.status})` }));
+        if (!res.ok) throw new Error(body.error ?? "Failed to load devices");
+        devices.push(...body.devices);
+        nextKey = body.nextKey;
+      } while (nextKey);
+
+      const byHealth: Record<string, number> = {};
+      for (const d of devices) byHealth[d.health] = (byHealth[d.health] ?? 0) + 1;
+      setData({ summary: { total: devices.length, byHealth }, devices, fetchedAt: new Date().toISOString() });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load devices");
+      if (mine === run.current) setError(err instanceof Error ? err.message : "Failed to load devices");
     } finally {
-      setLoading(false);
+      if (mine === run.current) setLoading(false);
     }
   }, [router]);
 

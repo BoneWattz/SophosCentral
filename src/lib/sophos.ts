@@ -154,6 +154,61 @@ export async function listLicenses(): Promise<SophosLicense[]> {
   }));
 }
 
+// GET against the tenant's regional API. Sophos occasionally answers 5xx/429 for a request that
+// works a moment later, so retry briefly. A 401 drops the cached token so the next call re-authenticates.
+async function sophosGet(url: URL, session: Session): Promise<Response> {
+  let res!: Response;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${session.accessToken}`,
+        "X-Tenant-ID": session.tenantId,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+    if (res.status < 500 && res.status !== 429) break;
+    await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+  }
+  if (res.status === 401) cached = null;
+  return res;
+}
+
+export interface DirectoryPerson {
+  id: string;
+  email: string | null;
+  groups: string[];
+}
+
+// Sophos accepts at most 50 ids per lookup.
+export const MAX_IDS_PER_LOOKUP = 50;
+
+// Email and group names for up to 50 directory users (a device's associatedPerson.id is a directory user id).
+export async function getPeopleByIds(ids: string[]): Promise<DirectoryPerson[]> {
+  if (ids.length === 0) return [];
+  if (ids.length > MAX_IDS_PER_LOOKUP) throw new Error(`At most ${MAX_IDS_PER_LOOKUP} ids per lookup`);
+
+  const session = await getSession();
+  const url = new URL(`${session.apiHost}/common/v1/directory/users`);
+  url.searchParams.set("pageSize", "100");
+  url.searchParams.set("fields", "id,email,groups"); // keeps the reply small and fast
+  url.searchParams.set("ids", ids.join(","));
+
+  const res = await sophosGet(url, session);
+  if (!res.ok) throw new Error(`Sophos user lookup failed (${res.status})`);
+
+  const body = (await res.json()) as {
+    items: { id: string; email?: string; groups?: { items?: { name?: string; displayName?: string }[] } }[];
+  };
+  return body.items.map((u) => ({
+    id: u.id,
+    email: u.email?.trim() || null,
+    groups: (u.groups?.items ?? [])
+      .map((g) => (g.displayName ?? g.name ?? "").replace(/ /g, " ").trim())
+      .filter(Boolean),
+  }));
+}
+
 export type DirectoryKind = "users" | "groups";
 
 export interface DirectoryQuery {
@@ -188,21 +243,7 @@ export async function getDirectoryPage<T = Record<string, unknown>>(q: Directory
     if (q.kind === "users") url.searchParams.set("searchFields", "name,email");
   }
 
-  // Sophos occasionally answers 5xx/429 for a request that works a moment later, so retry briefly.
-  let res!: Response;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    res = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-        "X-Tenant-ID": session.tenantId,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
-    if (res.status < 500 && res.status !== 429) break;
-    await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
-  }
-  if (res.status === 401) cached = null;
+  const res = await sophosGet(url, session);
   if (!res.ok) throw new Error(`Sophos directory request failed (${res.status})`);
 
   const body = (await res.json()) as {
@@ -217,41 +258,23 @@ export async function getDirectoryPage<T = Record<string, unknown>>(q: Directory
   };
 }
 
-// Fetches every enrolled endpoint, following Sophos' key-based pagination.
-export async function listEndpoints(): Promise<SophosEndpoint[]> {
+// One page (up to 500) of enrolled endpoints. Sophos pages by key, not number, so pages must be
+// fetched in order; the browser walks them one request at a time to stay well inside the
+// serverless time limit (a full fetch of ~1,500 devices can take close to 10 seconds).
+export async function getEndpointsPage(
+  pageFromKey?: string
+): Promise<{ items: SophosEndpoint[]; nextKey: string | null }> {
   const session = await getSession();
-  const endpoints: SophosEndpoint[] = [];
-  let pageFromKey: string | undefined;
+  const url = new URL(`${session.apiHost}/endpoint/v1/endpoints`);
+  url.searchParams.set("pageSize", "500");
+  // serialNumber is only returned by the "full" view; `fields` keeps the payload small.
+  url.searchParams.set("view", "full");
+  url.searchParams.set("fields", ENDPOINT_FIELDS);
+  if (pageFromKey) url.searchParams.set("pageFromKey", pageFromKey);
 
-  do {
-    const url = new URL(`${session.apiHost}/endpoint/v1/endpoints`);
-    url.searchParams.set("pageSize", "500");
-    url.searchParams.set("pageTotal", "true");
-    // serialNumber is only returned by the "full" view; `fields` keeps the payload small.
-    url.searchParams.set("view", "full");
-    url.searchParams.set("fields", ENDPOINT_FIELDS);
-    if (pageFromKey) url.searchParams.set("pageFromKey", pageFromKey);
+  const res = await sophosGet(url, session);
+  if (!res.ok) throw new Error(`Sophos endpoints request failed (${res.status})`);
 
-    const res = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-        "X-Tenant-ID": session.tenantId,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
-    if (res.status === 401) cached = null;
-    if (!res.ok) {
-      throw new Error(`Sophos endpoints request failed (${res.status})`);
-    }
-
-    const page = (await res.json()) as {
-      items: SophosEndpoint[];
-      pages?: { nextKey?: string };
-    };
-    endpoints.push(...page.items);
-    pageFromKey = page.pages?.nextKey;
-  } while (pageFromKey);
-
-  return endpoints;
+  const page = (await res.json()) as { items: SophosEndpoint[]; pages?: { nextKey?: string } };
+  return { items: page.items, nextKey: page.pages?.nextKey ?? null };
 }
