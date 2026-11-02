@@ -1,21 +1,54 @@
 "use client";
 
 import { useMemo } from "react";
-import DataTable, { type Column, type FilterDef } from "./DataTable";
+import DataTable, { type Column, type ExportConfig, type FilterDef } from "./DataTable";
 import LicenseSummary from "./LicenseSummary";
 import { IconCheckCircle, IconMonitor, IconShield, IconUser, IconXCircle } from "./icons";
 import { useDevices, type Device } from "@/lib/useDevices";
 import { useLicenses } from "@/lib/useLicenses";
+import { lookupPerson, usePeople } from "@/lib/usePeople";
+
+// A device plus its owner's email and group from the Sophos directory (loaded after the table appears).
+type EndpointRow = Device & {
+  email: string | null;
+  groups: string[];
+  personPending: boolean; // owner known but email/group not loaded yet
+};
 
 const installLabel = (status: string | undefined) =>
   status === "installed" ? "Installed" : status === "notInstalled" ? "Not installed" : "Unknown";
 const installClass = (status: string | undefined) =>
   status === "installed" ? "good" : status === "notInstalled" ? "bad" : "";
 
-const columns: Column<Device>[] = [
+const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
+const timestamp = (iso: string | null) => (iso ? new Date(iso).getTime() : null);
+const toDate = (iso: string | null) => (iso ? new Date(iso) : null);
+
+const columns: Column<EndpointRow>[] = [
   { header: "Hostname", render: (d) => d.hostname, sort: (d) => d.hostname },
   { header: "OS", render: (d) => d.os, sort: (d) => d.os },
   { header: "User", render: (d) => d.user ?? "—", sort: (d) => d.user },
+  {
+    header: "Email",
+    render: (d) => d.email ?? (d.personPending ? <span className="muted">…</span> : "—"),
+    sort: (d) => d.email,
+  },
+  {
+    header: "Group",
+    render: (d) =>
+      d.groups.length ? (
+        d.groups.map((g) => (
+          <span key={g} className="badge" style={{ marginRight: 4 }}>
+            {g}
+          </span>
+        ))
+      ) : d.personPending ? (
+        <span className="muted">…</span>
+      ) : (
+        "—"
+      ),
+    sort: (d) => d.groups.join(", "),
+  },
   { header: "Intercept X version", render: (d) => d.interceptX?.version ?? "—", sort: (d) => d.interceptX?.version },
   {
     header: "Intercept X",
@@ -31,22 +64,33 @@ const columns: Column<Device>[] = [
       d.online === null ? "—" : <span className={`badge ${d.online ? "good" : ""}`}>{d.online ? "Online" : "Offline"}</span>,
     sort: (d) => d.online,
   },
-  {
-    header: "Registered",
-    render: (d) => (d.registeredAt ? new Date(d.registeredAt).toLocaleString() : "—"),
-    sort: (d) => (d.registeredAt ? new Date(d.registeredAt).getTime() : null),
-  },
-  {
-    header: "Last seen",
-    render: (d) => (d.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString() : "—"),
-    sort: (d) => (d.lastSeenAt ? new Date(d.lastSeenAt).getTime() : null),
-  },
+  { header: "Registered", render: (d) => fmtDate(d.registeredAt), sort: (d) => timestamp(d.registeredAt) },
+  { header: "Last seen", render: (d) => fmtDate(d.lastSeenAt), sort: (d) => timestamp(d.lastSeenAt) },
 ];
 
-const searchText = (d: Device) =>
-  [d.hostname, d.user, d.os, d.interceptX?.version, d.serialNumber].filter(Boolean).join(" ");
+const searchText = (d: EndpointRow) =>
+  [d.hostname, d.user, d.email, d.groups.join(" "), d.os, d.interceptX?.version, d.serialNumber]
+    .filter(Boolean)
+    .join(" ");
+
+// What the Excel file contains: the table's columns plus serial number, with real dates.
+const exportColumns: ExportConfig<EndpointRow>["columns"] = [
+  { header: "Hostname", value: (d) => d.hostname, width: 24 },
+  { header: "Serial number", value: (d) => d.serialNumber, width: 22 },
+  { header: "OS", value: (d) => d.os, width: 22 },
+  { header: "User", value: (d) => d.user, width: 28 },
+  { header: "Email", value: (d) => d.email, width: 32 },
+  { header: "Group", value: (d) => d.groups.join("; "), width: 26 },
+  { header: "Intercept X version", value: (d) => d.interceptX?.version, width: 20 },
+  { header: "Intercept X", value: (d) => installLabel(d.interceptX?.status), width: 14 },
+  { header: "Health", value: (d) => d.health, width: 12 },
+  { header: "Online", value: (d) => (d.online === null ? null : d.online ? "Online" : "Offline"), width: 10 },
+  { header: "Registered", value: (d) => toDate(d.registeredAt), width: 18 },
+  { header: "Last seen", value: (d) => toDate(d.lastSeenAt), width: 18 },
+];
 
 const distinct = (values: string[]) => Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+const toOptions = (values: string[]) => values.map((v) => ({ value: v, label: v }));
 
 export default function EndpointView() {
   const devicesState = useDevices();
@@ -54,13 +98,30 @@ export default function EndpointView() {
   const devices = useMemo(() => devicesState.data?.devices ?? [], [devicesState.data]);
   const license = licensesState.licenses.find((l) => l.code === "CIXA-MSP");
 
+  const userIds = useMemo(
+    () => Array.from(new Set(devices.map((d) => d.userId).filter((id): id is string => !!id))),
+    [devices]
+  );
+  const people = usePeople(userIds);
+
+  // Re-built each time a batch of emails/groups arrives (people.version changes).
+  const rows = useMemo<EndpointRow[]>(
+    () =>
+      devices.map((d) => {
+        const p = lookupPerson(d.userId);
+        return { ...d, email: p?.email ?? null, groups: p?.groups ?? [], personPending: !!d.userId && p === undefined };
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [devices, people.version]
+  );
+
   const installed = devices.filter((d) => d.interceptX?.status === "installed").length;
   const notInstalled = devices.filter((d) => d.interceptX?.status !== "installed").length;
   const distinctUsers = new Set(
     devices.filter((d) => d.interceptX?.status === "installed" && d.userId).map((d) => d.userId)
   ).size;
 
-  const filters = useMemo<FilterDef<Device>[]>(
+  const filters = useMemo<FilterDef<EndpointRow>[]>(
     () => [
       {
         key: "install",
@@ -72,15 +133,21 @@ export default function EndpointView() {
         test: (d, v) => (v === "installed") === (d.interceptX?.status === "installed"),
       },
       {
+        key: "group",
+        label: "Group",
+        options: [{ value: "__none", label: "(no group)" }, ...toOptions(distinct(rows.flatMap((d) => d.groups)))],
+        test: (d, v) => (v === "__none" ? d.groups.length === 0 && !d.personPending : d.groups.includes(v)),
+      },
+      {
         key: "version",
         label: "Version",
-        options: distinct(devices.map((d) => d.interceptX?.version ?? "")).filter(Boolean).map((v) => ({ value: v, label: v })),
+        options: toOptions(distinct(rows.map((d) => d.interceptX?.version ?? "")).filter(Boolean)),
         test: (d, v) => d.interceptX?.version === v,
       },
       {
         key: "platform",
         label: "Platform",
-        options: distinct(devices.map((d) => d.platform)).map((v) => ({ value: v, label: v })),
+        options: toOptions(distinct(rows.map((d) => d.platform))),
         test: (d, v) => d.platform === v,
       },
       {
@@ -108,7 +175,17 @@ export default function EndpointView() {
         },
       },
     ],
-    [devices]
+    [rows]
+  );
+
+  const exportConfig = useMemo<ExportConfig<EndpointRow>>(
+    () => ({
+      fileName: "sophos-endpoint",
+      columns: exportColumns,
+      // Emails and groups arrive after the table; wait so the file isn't missing them.
+      disabledReason: people.loading ? "Still loading emails and groups. Export will be ready in a moment." : undefined,
+    }),
+    [people.loading]
   );
 
   const loading = devicesState.loading || licensesState.loading;
@@ -136,6 +213,14 @@ export default function EndpointView() {
       </div>
 
       {error && <p className="error" style={{ marginBottom: 12 }}>{error}</p>}
+      {people.failed > 0 && !people.loading && (
+        <p className="error" style={{ marginBottom: 12 }}>
+          Couldn&apos;t load the email and group for {people.failed.toLocaleString()} users.{" "}
+          <button className="link-btn" onClick={people.retry}>
+            Retry
+          </button>
+        </p>
+      )}
 
       <LicenseSummary
         title="Sophos Endpoint (Intercept X Advanced)"
@@ -153,11 +238,12 @@ export default function EndpointView() {
 
       <DataTable
         columns={columns}
-        rows={devices}
+        rows={rows}
         rowKey={(d) => d.id}
         searchText={searchText}
-        searchPlaceholder="Search hostname, user, OS or version…"
+        searchPlaceholder="Search hostname, user, email, group, OS or version…"
         filters={filters}
+        exportConfig={exportConfig}
         loading={devicesState.loading}
         emptyText="No devices found"
       />
