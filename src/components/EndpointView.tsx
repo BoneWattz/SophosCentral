@@ -32,6 +32,11 @@ const columns: Column<Device>[] = [
     sort: (d) => d.online,
   },
   {
+    header: "Registered",
+    render: (d) => (d.registeredAt ? new Date(d.registeredAt).toLocaleString() : "—"),
+    sort: (d) => (d.registeredAt ? new Date(d.registeredAt).getTime() : null),
+  },
+  {
     header: "Last seen",
     render: (d) => (d.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString() : "—"),
     sort: (d) => (d.lastSeenAt ? new Date(d.lastSeenAt).getTime() : null),
@@ -86,6 +91,21 @@ export default function EndpointView() {
           { value: "offline", label: "Offline" },
         ],
         test: (d, v) => (v === "online" ? d.online === true : d.online === false),
+      },
+      {
+        key: "registered",
+        label: "Registered",
+        options: [
+          { value: "7d", label: "Within 7 days" },
+          { value: "30d", label: "Within 30 days" },
+          { value: "90d", label: "Within 90 days" },
+          { value: "older", label: "Older than 90 days" },
+        ],
+        test: (d, v) => {
+          if (!d.registeredAt) return false;
+          const days = (Date.now() - new Date(d.registeredAt).getTime()) / 86_400_000;
+          return v === "older" ? days > 90 : days <= Number.parseInt(v, 10);
+        },
       },
     ],
     [devices]
