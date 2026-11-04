@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { downloadXlsx, type ExportColumn } from "@/lib/exportExcel";
 import { PAGE_SIZES, pageList } from "@/lib/pageList";
 import {
   IconArrowDown,
@@ -35,12 +36,10 @@ export interface FilterDef<T> {
   test: (row: T, value: string) => boolean;
 }
 
-type ExportValue = string | number | boolean | Date | null | undefined;
-
 // Adds an "Export Excel" button that downloads every row matching the current search, filters and sort.
 export interface ExportConfig<T> {
   fileName: string; // without extension; today's date is appended
-  columns: { header: string; value: (row: T) => ExportValue; width?: number }[];
+  columns: ExportColumn<T>[];
   // Set while the export data isn't complete yet (e.g. still loading emails).
   disabledReason?: string;
 }
@@ -130,22 +129,7 @@ export default function DataTable<T>({
     if (!exportConfig || exporting) return;
     setExporting(true);
     try {
-      // Loaded on demand so the Excel library isn't part of the page's initial download.
-      const { default: writeXlsxFile } = await import("write-excel-file/browser");
-      const cell = (v: ExportValue) => {
-        if (v === null || v === undefined || v === "") return null;
-        if (v instanceof Date) return { value: v, format: "yyyy-mm-dd hh:mm" };
-        return v;
-      };
-      const sheetData = [
-        exportConfig.columns.map((c) => ({ value: c.header, fontWeight: "bold" as const })),
-        ...sorted.map((row) => exportConfig.columns.map((c) => cell(c.value(row)))),
-      ];
-      const day = new Date().toISOString().slice(0, 10);
-      await writeXlsxFile(sheetData, {
-        columns: exportConfig.columns.map((c) => ({ width: c.width ?? 18 })),
-        stickyRowsCount: 1,
-      }).toFile(`${exportConfig.fileName}-${day}.xlsx`);
+      await downloadXlsx(exportConfig.fileName, exportConfig.columns, sorted);
     } catch (err) {
       console.error(err);
       alert("Couldn't create the Excel file. Please try again.");

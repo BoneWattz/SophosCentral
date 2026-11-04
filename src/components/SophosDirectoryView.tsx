@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import RemoteTable, { type RemoteColumn } from "./RemoteTable";
+import type { ExportColumn } from "@/lib/exportExcel";
 
 type Tab = "users" | "groups";
 
@@ -59,6 +60,25 @@ const groupColumns: RemoteColumn<DirGroup>[] = [
   { header: "Source", render: (g) => g.source },
   { header: "Created", render: (g) => fmt(g.createdAt), sortKey: "createdAt" },
   { header: "Updated", render: (g) => fmt(g.updatedAt), sortKey: "updatedAt" },
+];
+
+// Excel files: all rows matching the current search and sort, with real dates and every group name.
+const userExport: ExportColumn<DirUser>[] = [
+  { header: "Name", value: (u) => u.name, width: 32 },
+  { header: "Email", value: (u) => u.email, width: 34 },
+  { header: "Groups", value: (u) => u.groups.join("; "), width: 30 },
+  { header: "Source", value: (u) => u.source, width: 12 },
+  { header: "Created", value: (u) => (u.createdAt ? new Date(u.createdAt) : null), width: 18 },
+  { header: "Updated", value: (u) => (u.updatedAt ? new Date(u.updatedAt) : null), width: 18 },
+];
+
+const groupExport: ExportColumn<DirGroup>[] = [
+  { header: "Name", value: (g) => g.name, width: 36 },
+  { header: "Description", value: (g) => g.description, width: 40 },
+  { header: "Users", value: (g) => g.userCount, width: 10 },
+  { header: "Source", value: (g) => g.source, width: 12 },
+  { header: "Created", value: (g) => (g.createdAt ? new Date(g.createdAt) : null), width: 18 },
+  { header: "Updated", value: (g) => (g.updatedAt ? new Date(g.updatedAt) : null), width: 18 },
 ];
 
 const TABS: { key: Tab; label: string; blurb: string }[] = [
@@ -120,6 +140,7 @@ export default function SophosDirectoryView({ initialTab }: { initialTab: Tab })
             rowKey={(u) => u.id}
             searchPlaceholder="Search name or email…"
             emptyText="No users found"
+            exportConfig={{ fileName: "sophos-users", columns: userExport }}
             refreshToken={refresh.users}
             onError={(m) => setErrors((e) => ({ ...e, users: m }))}
           />
@@ -133,6 +154,7 @@ export default function SophosDirectoryView({ initialTab }: { initialTab: Tab })
             rowKey={(g) => g.id}
             searchPlaceholder="Search group name…"
             emptyText="No groups found"
+            exportConfig={{ fileName: "sophos-groups", columns: groupExport }}
             refreshToken={refresh.groups}
             onError={(m) => setErrors((e) => ({ ...e, groups: m }))}
           />

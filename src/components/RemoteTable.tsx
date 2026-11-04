@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { downloadXlsx, type ExportColumn } from "@/lib/exportExcel";
 import { PAGE_SIZES, pageList } from "@/lib/pageList";
-import { IconArrowDown, IconArrowUp, IconChevronLeft, IconChevronRight, IconSort } from "./icons";
+import { IconArrowDown, IconArrowUp, IconChevronLeft, IconChevronRight, IconDownload, IconSort } from "./icons";
 
 export interface RemoteColumn<T> {
   header: string;
@@ -23,6 +24,9 @@ interface Props<T> {
   emptyText?: string;
   // Sort used on first load and when a sort is cleared. Defaults to newest first.
   defaultSort?: { key: string; dir: SortDir };
+  // Adds an "Export Excel" button. It downloads every row matching the current search and sort,
+  // fetching all pages from the server first.
+  exportConfig?: { fileName: string; columns: ExportColumn<T>[] };
   // Change this number to reload the current page from the source (skips the server cache).
   refreshToken?: number;
   onError?: (message: string | null) => void;
@@ -37,6 +41,7 @@ export default function RemoteTable<T>({
   searchPlaceholder = "Search…",
   emptyText = "No records found",
   defaultSort = { key: "createdAt", dir: "desc" },
+  exportConfig,
   refreshToken = 0,
   onError,
 }: Props<T>) {
@@ -114,6 +119,48 @@ export default function RemoteTable<T>({
     });
   }
 
+  const [exporting, setExporting] = useState<{ done: number; total: number } | null>(null);
+
+  // Fetches every page that matches the current search and sort (100 rows each, a few at a time),
+  // then builds the Excel file in the browser.
+  async function exportAll() {
+    if (!exportConfig || exporting || total === 0) return;
+    const PER_PAGE = 100; // the most Sophos allows
+    const pageCount = Math.ceil(total / PER_PAGE);
+    setExporting({ done: 0, total: pageCount });
+    try {
+      const results: T[][] = new Array(pageCount);
+      let next = 0;
+      let done = 0;
+      const worker = async () => {
+        while (next < pageCount) {
+          const index = next++;
+          const url = new URL(endpoint, window.location.origin);
+          url.searchParams.set("page", String(index + 1));
+          url.searchParams.set("pageSize", String(PER_PAGE));
+          url.searchParams.set("sort", `${sort.key}:${sort.dir}`);
+          if (search) url.searchParams.set("search", search);
+          const res = await fetch(url, { cache: "no-store" });
+          if (res.status === 401) {
+            router.replace("/login");
+            throw new Error("Signed out");
+          }
+          const body = await res.json().catch(() => null);
+          if (!res.ok || !body) throw new Error(body?.error ?? `HTTP ${res.status}`);
+          results[index] = body.items;
+          setExporting({ done: ++done, total: pageCount });
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(6, pageCount) }, worker));
+      await downloadXlsx(exportConfig.fileName, exportConfig.columns, results.flat());
+    } catch (err) {
+      console.error(err);
+      alert(`Couldn't create the Excel file${err instanceof Error ? `: ${err.message}` : ""}. Please try again.`);
+    } finally {
+      setExporting(null);
+    }
+  }
+
   const current = Math.min(page, pages);
   const first = total === 0 ? 0 : (current - 1) * pageSize + 1;
   const last = (current - 1) * pageSize + rows.length;
@@ -122,6 +169,18 @@ export default function RemoteTable<T>({
     <div className="card table-card">
       <div className="table-toolbar">
         <input placeholder={searchPlaceholder} value={input} onChange={(e) => setInput(e.target.value)} />
+        {exportConfig && (
+          <button
+            type="button"
+            className="btn secondary filter-btn"
+            onClick={exportAll}
+            disabled={!!exporting || loading || total === 0}
+            title={`Download ${total.toLocaleString()} rows as an Excel file`}
+          >
+            <IconDownload size={16} />
+            {exporting ? `Exporting ${exporting.done}/${exporting.total}…` : "Export Excel"}
+          </button>
+        )}
       </div>
 
       <div className="table-wrap" style={{ opacity: loading ? 0.6 : 1, transition: "opacity .15s" }}>
