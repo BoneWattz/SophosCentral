@@ -190,7 +190,7 @@ td.actions-cell { text-align: right; width: 1%; }
 .pager .gap { padding: 0 4px; }
 .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; text-transform: capitalize; background: var(--surface-2); color: var(--muted); }
 .badge.good, .badge.admin { background: var(--ok-soft); color: var(--ok-text); }
-.badge.suspicious { background: var(--warn-soft); color: var(--warn-text); }
+.badge.suspicious, .badge.warn { background: var(--warn-soft); color: var(--warn-text); }
 .badge.bad { background: var(--bad-soft); color: var(--bad-text); }
 
 /* ---------- licence summary ---------- */
