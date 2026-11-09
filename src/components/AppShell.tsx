@@ -11,6 +11,7 @@ import {
   IconLock,
   IconMonitor,
   IconMoon,
+  IconReport,
   IconSearch,
   IconServer,
   IconShield,
@@ -101,6 +102,9 @@ export default function AppShell({
         {link("/dashboard/hc", "HC", <IconIdCard />)}
         {link("/dashboard/it-monitoring", "GT - IT Monitoring", <IconServer />)}
         {link("/dashboard/sophos", "Users & Groups", <IconUsers />)}
+
+        <div className="nav-section">REPORT</div>
+        {link("/dashboard/finance", "Finance", <IconReport />)}
 
         <div className="nav-section">PRODUCTS</div>
         {link("/dashboard/endpoint", "Sophos Endpoint", <IconShield />)}

@@ -88,3 +88,6 @@ export const IconChevronRight = ({ size }: { size?: number }) => (
 export const IconEdit = ({ size }: { size?: number }) => (
   <Svg size={size}><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" /></Svg>
 );
+export const IconReport = ({ size }: { size?: number }) => (
+  <Svg size={size}><path d="M6 3h8l4 4v14H6V3zM14 3v4h4M9 12h6M9 16h6M9 9h2" /></Svg>
+);

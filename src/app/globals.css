@@ -269,3 +269,7 @@ td.actions-cell { text-align: right; width: 1%; }
   .topbar { padding: 10px 14px; }
   .content { padding: 18px 14px 32px; }
 }
+
+/* Finance report: a heavier line above the first device row of each employee, and muted repeats below it. */
+tr.group-start td { border-top: 2px solid color-mix(in srgb, var(--muted) 40%, transparent); }
+tr.group-cont td:not(:last-child) { color: var(--muted); }

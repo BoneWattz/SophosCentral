@@ -61,6 +61,8 @@ interface DataTableProps<T> {
   exportConfig?: ExportConfig<T>;
   // Trailing cell, e.g. edit/delete buttons.
   actions?: (row: T) => ReactNode;
+  // Extra CSS class for a row (e.g. to draw a separator above it).
+  rowClass?: (row: T) => string | undefined;
   loading?: boolean;
   emptyText?: string;
   pageSize?: number;
@@ -79,6 +81,7 @@ export default function DataTable<T>({
   filters = [],
   exportConfig,
   actions,
+  rowClass,
   loading = false,
   emptyText = "No records found",
   pageSize: initialPageSize = 10,
@@ -280,7 +283,7 @@ export default function DataTable<T>({
           </thead>
           <tbody>
             {visible.map((row) => (
-              <tr key={rowKey(row)}>
+              <tr key={rowKey(row)} className={rowClass?.(row)}>
                 {columns.map((c) => (
                   <td key={c.header}>{c.render(row)}</td>
                 ))}
