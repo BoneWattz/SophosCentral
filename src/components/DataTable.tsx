@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { downloadXlsx, type ExportColumn } from "@/lib/exportExcel";
 import { PAGE_SIZES, pageList } from "@/lib/pageList";
 import {
@@ -8,6 +8,7 @@ import {
   IconArrowUp,
   IconChevronLeft,
   IconChevronRight,
+  IconColumns,
   IconDownload,
   IconFilter,
   IconSort,
@@ -61,6 +62,8 @@ interface DataTableProps<T> {
   exportConfig?: ExportConfig<T>;
   // Trailing cell, e.g. edit/delete buttons.
   actions?: (row: T) => ReactNode;
+  // Adds a "Columns" button so users can hide and show columns.
+  columnToggle?: boolean;
   // Extra CSS class for a row (e.g. to draw a separator above it).
   rowClass?: (row: T) => string | undefined;
   loading?: boolean;
@@ -81,6 +84,7 @@ export default function DataTable<T>({
   filters = [],
   exportConfig,
   actions,
+  columnToggle = false,
   rowClass,
   loading = false,
   emptyText = "No records found",
@@ -94,6 +98,29 @@ export default function DataTable<T>({
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [colsOpen, setColsOpen] = useState(false);
+  const colsRef = useRef<HTMLDivElement>(null);
+  const shown = columns.filter((c) => !hidden.has(c.header));
+
+  // Close the Columns menu when clicking elsewhere.
+  useEffect(() => {
+    if (!colsOpen) return;
+    const close = (e: MouseEvent) => {
+      if (!colsRef.current?.contains(e.target as Node)) setColsOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [colsOpen]);
+
+  function toggleColumn(header: string) {
+    setHidden((h) => {
+      const next = new Set(h);
+      if (next.has(header)) next.delete(header);
+      else if (next.size < columns.length - 1) next.add(header); // always keep one column
+      return next;
+    });
+  }
 
   // The top-bar search can change ?q= while this table stays mounted.
   useEffect(() => setQuery(initialQuery), [initialQuery]);
@@ -211,6 +238,35 @@ export default function DataTable<T>({
             {activeFilters > 0 && <span className="count">{activeFilters}</span>}
           </button>
         )}
+        {columnToggle && (
+          <div className="col-menu" ref={colsRef}>
+            <button
+              type="button"
+              className={`btn secondary filter-btn${colsOpen ? " on" : ""}`}
+              onClick={() => setColsOpen((o) => !o)}
+              aria-expanded={colsOpen}
+            >
+              <IconColumns size={16} />
+              Columns
+              {hidden.size > 0 && <span className="count">{columns.length - hidden.size}/{columns.length}</span>}
+            </button>
+            {colsOpen && (
+              <div className="col-pop">
+                {columns.map((c) => (
+                  <label key={c.header}>
+                    <input type="checkbox" checked={!hidden.has(c.header)} onChange={() => toggleColumn(c.header)} />
+                    {c.header}
+                  </label>
+                ))}
+                {hidden.size > 0 && (
+                  <button type="button" className="link-btn" onClick={() => setHidden(new Set())}>
+                    Show all
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {exportConfig && (
           <button
             type="button"
@@ -255,7 +311,7 @@ export default function DataTable<T>({
         <table>
           <thead>
             <tr>
-              {columns.map((c) => {
+              {shown.map((c) => {
                 const active = sortBy === c.header;
                 return (
                   <th
@@ -284,7 +340,7 @@ export default function DataTable<T>({
           <tbody>
             {visible.map((row) => (
               <tr key={rowKey(row)} className={rowClass?.(row)}>
-                {columns.map((c) => (
+                {shown.map((c) => (
                   <td key={c.header}>{c.render(row)}</td>
                 ))}
                 {actions && <td className="actions-cell">{actions(row)}</td>}
@@ -292,7 +348,7 @@ export default function DataTable<T>({
             ))}
             {visible.length === 0 && (
               <tr>
-                <td className="empty" colSpan={columns.length + (actions ? 1 : 0)}>
+                <td className="empty" colSpan={shown.length + (actions ? 1 : 0)}>
                   {loading ? "Loading…" : emptyText}
                 </td>
               </tr>

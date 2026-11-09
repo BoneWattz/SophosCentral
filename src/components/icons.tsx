@@ -91,3 +91,6 @@ export const IconEdit = ({ size }: { size?: number }) => (
 export const IconReport = ({ size }: { size?: number }) => (
   <Svg size={size}><path d="M6 3h8l4 4v14H6V3zM14 3v4h4M9 12h6M9 16h6M9 9h2" /></Svg>
 );
+export const IconColumns = ({ size }: { size?: number }) => (
+  <Svg size={size}><rect x="3.5" y="5" width="17" height="14" rx="2" /><path d="M9.5 5v14M14.5 5v14" /></Svg>
+);

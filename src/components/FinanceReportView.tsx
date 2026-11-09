@@ -7,17 +7,14 @@ import { useDevices } from "@/lib/useDevices";
 import { lookupPerson, usePeople } from "@/lib/usePeople";
 import type { ItRow } from "@/lib/itMonitoring";
 
-// One line of the report: one device of one employee. An employee with several devices
-// gets several lines; the first line of each employee starts a new group.
+// One line of the report per employee; all of their Sophos devices are listed in one cell.
 interface ReportRow {
   key: string;
   idNumber: number | null;
   fullName: string | null;
   email: string | null; // MS 365 Email from GT - IT Monitoring
   clientName: string | null;
-  device: string | null; // Sophos hostname; null = no device found
-  deviceIndex: number; // 0 for the first device of an employee
-  deviceCount: number;
+  devices: string[]; // Sophos hostnames, A-Z (empty = no device found)
 }
 
 const dash = (v: string | number | null) => (v === null || v === "" ? "—" : v);
@@ -25,7 +22,6 @@ const lower = (v: string | null | undefined) => v?.trim().toLowerCase() || null;
 const distinct = (values: (string | null)[]) =>
   Array.from(new Set(values.filter((v): v is string => !!v))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-// On follow-up devices the employee columns repeat in grey (see globals.css), so a page break or a sort never leaves blank cells.
 const columns: Column<ReportRow>[] = [
   { header: "ID Number", render: (r) => dash(r.idNumber), sort: (r) => r.idNumber },
   { header: "Full Name", render: (r) => dash(r.fullName), sort: (r) => r.fullName },
@@ -33,11 +29,21 @@ const columns: Column<ReportRow>[] = [
   { header: "Department / Client Name", render: (r) => dash(r.clientName), sort: (r) => r.clientName },
   {
     header: "Device",
-    render: (r) => (r.device ? r.device : <span className="muted">No device found</span>),
+    render: (r) =>
+      r.devices.length ? (
+        <div className="cell-list">
+          {r.devices.map((d) => (
+            <span key={d}>{d}</span>
+          ))}
+        </div>
+      ) : (
+        <span className="muted">No device found</span>
+      ),
+    sort: (r) => r.devices[0],
   },
 ];
 
-const searchText = (r: ReportRow) => [r.idNumber, r.fullName, r.email, r.clientName, r.device].filter((v) => v !== null).join(" ");
+const searchText = (r: ReportRow) => [r.idNumber, r.fullName, r.email, r.clientName, r.devices.join(" ")].filter((v) => v !== null).join(" ");
 
 const exportConfig: ExportConfig<ReportRow> = {
   fileName: "finance-report",
@@ -46,8 +52,8 @@ const exportConfig: ExportConfig<ReportRow> = {
     { header: "Full Name", value: (r) => r.fullName, width: 32 },
     { header: "Email", value: (r) => r.email, width: 34 },
     { header: "Department / Client Name", value: (r) => r.clientName, width: 34 },
-    { header: "Device", value: (r) => r.device ?? "No device found", width: 26 },
-    { header: "Devices", value: (r) => r.deviceCount, width: 10 },
+    { header: "Device", value: (r) => (r.devices.length ? r.devices.join("; ") : "No device found"), width: 40 },
+    { header: "No. of devices", value: (r) => r.devices.length, width: 14 },
   ],
 };
 
@@ -116,24 +122,15 @@ export default function FinanceReportView() {
       byEmployee.set(i, list);
     }
 
-    // Employees in the same order as the table (newest first), devices A-Z within each employee.
-    const out: ReportRow[] = [];
-    employees.forEach((e, i) => {
-      const hosts = (byEmployee.get(i) ?? []).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-      const list: (string | null)[] = hosts.length ? hosts : [null];
-      list.forEach((device, n) =>
-        out.push({
-          key: `${e.id}-${n}`,
-          idNumber: e.idNumber,
-          fullName: e.completeName,
-          email: e.ms365Email,
-          clientName: e.clientName,
-          device,
-          deviceIndex: n,
-          deviceCount: hosts.length,
-        })
-      );
-    });
+    // Employees in the same order as the GT - IT Monitoring table (newest first), devices A-Z.
+    const out: ReportRow[] = employees.map((e, i) => ({
+      key: String(e.id),
+      idNumber: e.idNumber,
+      fullName: e.completeName,
+      email: e.ms365Email,
+      clientName: e.clientName,
+      devices: (byEmployee.get(i) ?? []).sort((x, y) => x.localeCompare(y, undefined, { numeric: true })),
+    }));
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employees, devices, people.version]);
@@ -148,7 +145,7 @@ export default function FinanceReportView() {
           { value: "one", label: "One device" },
           { value: "many", label: "Multiple devices" },
         ],
-        test: (r, v) => (v === "none" ? r.deviceCount === 0 : v === "one" ? r.deviceCount === 1 : r.deviceCount > 1),
+        test: (r, v) => (v === "none" ? r.devices.length === 0 : v === "one" ? r.devices.length === 1 : r.devices.length > 1),
       },
       {
         key: "client",
@@ -165,8 +162,8 @@ export default function FinanceReportView() {
   const error = devicesState.error ?? empError;
 
   const employeeCount = employees.length;
-  const withDevices = new Set(rows.filter((r) => r.device).map((r) => r.key.split("-")[0])).size;
-  const multi = new Set(rows.filter((r) => r.deviceCount > 1).map((r) => r.key.split("-")[0])).size;
+  const withDevices = rows.filter((r) => r.devices.length > 0).length;
+  const multi = rows.filter((r) => r.devices.length > 1).length;
 
   return (
     <>
@@ -214,7 +211,7 @@ export default function FinanceReportView() {
           ...exportConfig,
           disabledReason: emailsReady && !empLoading ? undefined : "Still matching devices. Export will be ready in a moment.",
         }}
-        rowClass={(r) => (r.deviceIndex === 0 ? "group-start" : "group-cont")}
+        columnToggle
         loading={loading}
         emptyText="No records found"
       />
