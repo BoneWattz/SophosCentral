@@ -100,38 +100,52 @@ export default function FinanceReportView() {
   const people = usePeople(userIds);
 
   const rows = useMemo<ReportRow[]>(() => {
-    // email -> first employee that owns it (MS 365 email first, then Sophos email). The sheet repeats a few
-    // emails; the first record wins so a device is never listed twice.
+    // The sheet can hold the same person more than once (same MS 365 email, sometimes with a different Sophos
+    // email). Those records are combined into one employee so the report shows one row per person.
+    const groups = new Map<string, ItRow[]>();
+    for (const e of employees) {
+      const key = lower(e.ms365Email) ?? lower(e.sophosEmail) ?? `id:${e.id}`;
+      const list = groups.get(key);
+      if (list) list.push(e);
+      else groups.set(key, [e]);
+    }
+    const people_ = Array.from(groups.values()); // Map keeps insertion order = newest record first
+
+    // email (MS 365 or Sophos, any record of the person) -> the person that owns it. First person wins.
     const owner = new Map<string, number>();
-    employees.forEach((e, i) => {
-      const m = lower(e.ms365Email);
-      if (m && !owner.has(m)) owner.set(m, i);
+    people_.forEach((g, i) => {
+      for (const e of g) {
+        const m = lower(e.ms365Email);
+        if (m && !owner.has(m)) owner.set(m, i);
+      }
     });
-    employees.forEach((e, i) => {
-      const s = lower(e.sophosEmail);
-      if (s && !owner.has(s)) owner.set(s, i);
+    people_.forEach((g, i) => {
+      for (const e of g) {
+        const sEmail = lower(e.sophosEmail);
+        if (sEmail && !owner.has(sEmail)) owner.set(sEmail, i);
+      }
     });
 
-    const byEmployee = new Map<number, string[]>();
+    const byPerson = new Map<number, string[]>();
     for (const d of devices) {
       const email = lower(lookupPerson(d.userId)?.email);
       const i = email ? owner.get(email) : undefined;
       if (i === undefined) continue;
-      const list = byEmployee.get(i) ?? [];
+      const list = byPerson.get(i) ?? [];
       list.push(d.hostname);
-      byEmployee.set(i, list);
+      byPerson.set(i, list);
     }
 
-    // Employees in the same order as the GT - IT Monitoring table (newest first), devices A-Z.
-    const out: ReportRow[] = employees.map((e, i) => ({
-      key: String(e.id),
-      idNumber: e.idNumber,
-      fullName: e.completeName,
-      email: e.ms365Email,
-      clientName: e.clientName,
-      devices: (byEmployee.get(i) ?? []).sort((x, y) => x.localeCompare(y, undefined, { numeric: true })),
+    // First record's values, with any blanks filled from the person's other records. Devices A-Z.
+    const pick = <K extends keyof ItRow>(g: ItRow[], k: K) => g.map((e) => e[k]).find((v) => v !== null && v !== "") ?? null;
+    return people_.map((g, i) => ({
+      key: String(g[0].id),
+      idNumber: pick(g, "idNumber") as number | null,
+      fullName: pick(g, "completeName") as string | null,
+      email: pick(g, "ms365Email") as string | null,
+      clientName: pick(g, "clientName") as string | null,
+      devices: (byPerson.get(i) ?? []).sort((x, y) => x.localeCompare(y, undefined, { numeric: true })),
     }));
-    return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employees, devices, people.version]);
 
@@ -161,7 +175,7 @@ export default function FinanceReportView() {
   const loading = devicesState.loading || empLoading || people.loading;
   const error = devicesState.error ?? empError;
 
-  const employeeCount = employees.length;
+  const employeeCount = rows.length;
   const withDevices = rows.filter((r) => r.devices.length > 0).length;
   const multi = rows.filter((r) => r.devices.length > 1).length;
 
