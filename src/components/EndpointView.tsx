@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import DataTable, { type Column, type ExportConfig, type FilterDef } from "./DataTable";
 import LicenseSummary from "./LicenseSummary";
 import { IconCheckCircle, IconMonitor, IconShield, IconUser, IconXCircle } from "./icons";
@@ -178,14 +178,21 @@ export default function EndpointView() {
     [rows]
   );
 
+  // "Without email": no owner on the device, or the owner has no email in the Sophos directory.
+  // Only counted once emails have finished loading, otherwise devices still waiting would be included.
+  const [tab, setTab] = useState<"all" | "noEmail">("all");
+  const noEmailRows = useMemo(() => rows.filter((d) => !d.email && !d.personPending), [rows]);
+  const emailsReady = !people.loading;
+  const tableRows = tab === "noEmail" ? noEmailRows : rows;
+
   const exportConfig = useMemo<ExportConfig<EndpointRow>>(
     () => ({
-      fileName: "sophos-endpoint",
+      fileName: tab === "noEmail" ? "sophos-endpoint-no-email" : "sophos-endpoint",
       columns: exportColumns,
       // Emails and groups arrive after the table; wait so the file isn't missing them.
       disabledReason: people.loading ? "Still loading emails and groups. Export will be ready in a moment." : undefined,
     }),
-    [people.loading]
+    [people.loading, tab]
   );
 
   const loading = devicesState.loading || licensesState.loading;
@@ -236,16 +243,30 @@ export default function EndpointView() {
         ]}
       />
 
+      <div className="tabs" role="tablist">
+        <button role="tab" aria-selected={tab === "all"} className={`tab${tab === "all" ? " active" : ""}`} onClick={() => setTab("all")}>
+          All devices ({rows.length.toLocaleString()})
+        </button>
+        <button
+          role="tab"
+          aria-selected={tab === "noEmail"}
+          className={`tab${tab === "noEmail" ? " active" : ""}`}
+          onClick={() => setTab("noEmail")}
+        >
+          Devices without email ({emailsReady ? noEmailRows.length.toLocaleString() : "…"})
+        </button>
+      </div>
+
       <DataTable
         columns={columns}
-        rows={rows}
+        rows={tableRows}
         rowKey={(d) => d.id}
         searchText={searchText}
         searchPlaceholder="Search hostname, user, email, group, OS or version…"
         filters={filters}
         exportConfig={exportConfig}
-        loading={devicesState.loading}
-        emptyText="No devices found"
+        loading={devicesState.loading || (tab === "noEmail" && !emailsReady)}
+        emptyText={tab === "noEmail" ? "Every device has an email" : "No devices found"}
       />
     </>
   );
