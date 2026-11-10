@@ -104,7 +104,8 @@ export default function AppShell({
         {link("/dashboard/sophos", "Users & Groups", <IconUsers />)}
 
         <div className="nav-section">REPORT</div>
-        {link("/dashboard/finance", "Finance", <IconReport />)}
+        {link("/dashboard/finance", "Finance", <IconReport />, true)}
+        {link("/dashboard/finance/endpoint", "Finance - Endpoint", <IconReport />)}
 
         <div className="nav-section">PRODUCTS</div>
         {link("/dashboard/endpoint", "Sophos Endpoint", <IconShield />)}

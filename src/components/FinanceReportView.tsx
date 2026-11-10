@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo } from "react";
 import DataTable, { type Column, type ExportConfig, type FilterDef } from "./DataTable";
 import { useDevices } from "@/lib/useDevices";
 import { lookupPerson, usePeople } from "@/lib/usePeople";
-import type { ItRow } from "@/lib/itMonitoring";
+import { useItEmployees } from "@/lib/useItEmployees";
+import { firstValue, groupByPerson, lowerEmail, ownerIndex } from "@/lib/itMonitoring";
 
 // One line of the report per employee; all of their Sophos devices are listed in one cell.
 interface ReportRow {
@@ -18,7 +18,6 @@ interface ReportRow {
 }
 
 const dash = (v: string | number | null) => (v === null || v === "" ? "—" : v);
-const lower = (v: string | null | undefined) => v?.trim().toLowerCase() || null;
 const distinct = (values: (string | null)[]) =>
   Array.from(new Set(values.filter((v): v is string => !!v))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
@@ -58,39 +57,10 @@ const exportConfig: ExportConfig<ReportRow> = {
 };
 
 export default function FinanceReportView() {
-  const router = useRouter();
   const devicesState = useDevices();
   const devices = useMemo(() => devicesState.data?.devices ?? [], [devicesState.data]);
 
-  const [employees, setEmployees] = useState<ItRow[]>([]);
-  const [empLoading, setEmpLoading] = useState(true);
-  const [empError, setEmpError] = useState<string | null>(null);
-
-  const loadEmployees = useCallback(async () => {
-    setEmpLoading(true);
-    try {
-      const res = await fetch("/api/it-monitoring", { cache: "no-store" });
-      if (res.status === 401) {
-        router.replace("/login");
-        return;
-      }
-      const body = await res.json().catch(() => ({ error: `Server error (HTTP ${res.status})` }));
-      if (!res.ok) {
-        setEmpError(body.error ?? "Failed to load GT - IT Monitoring");
-        return;
-      }
-      setEmpError(null);
-      setEmployees(body.rows);
-    } catch {
-      setEmpError("Could not reach the server. Check your connection and try again.");
-    } finally {
-      setEmpLoading(false);
-    }
-  }, [router]);
-
-  useEffect(() => {
-    loadEmployees();
-  }, [loadEmployees]);
+  const { employees, loading: empLoading, error: empError, reload: loadEmployees } = useItEmployees();
 
   // Devices carry the Sophos user id; the email comes from the directory lookup (as on the Sophos Endpoint page).
   const userIds = useMemo(
@@ -100,35 +70,13 @@ export default function FinanceReportView() {
   const people = usePeople(userIds);
 
   const rows = useMemo<ReportRow[]>(() => {
-    // The sheet can hold the same person more than once (same MS 365 email, sometimes with a different Sophos
-    // email). Those records are combined into one employee so the report shows one row per person.
-    const groups = new Map<string, ItRow[]>();
-    for (const e of employees) {
-      const key = lower(e.ms365Email) ?? lower(e.sophosEmail) ?? `id:${e.id}`;
-      const list = groups.get(key);
-      if (list) list.push(e);
-      else groups.set(key, [e]);
-    }
-    const people_ = Array.from(groups.values()); // Map keeps insertion order = newest record first
-
-    // email (MS 365 or Sophos, any record of the person) -> the person that owns it. First person wins.
-    const owner = new Map<string, number>();
-    people_.forEach((g, i) => {
-      for (const e of g) {
-        const m = lower(e.ms365Email);
-        if (m && !owner.has(m)) owner.set(m, i);
-      }
-    });
-    people_.forEach((g, i) => {
-      for (const e of g) {
-        const sEmail = lower(e.sophosEmail);
-        if (sEmail && !owner.has(sEmail)) owner.set(sEmail, i);
-      }
-    });
+    // Records of the same person (same MS 365 email) are combined so the report shows one row per person.
+    const group = groupByPerson(employees);
+    const owner = ownerIndex(group);
 
     const byPerson = new Map<number, string[]>();
     for (const d of devices) {
-      const email = lower(lookupPerson(d.userId)?.email);
+      const email = lowerEmail(lookupPerson(d.userId)?.email);
       const i = email ? owner.get(email) : undefined;
       if (i === undefined) continue;
       const list = byPerson.get(i) ?? [];
@@ -136,14 +84,12 @@ export default function FinanceReportView() {
       byPerson.set(i, list);
     }
 
-    // First record's values, with any blanks filled from the person's other records. Devices A-Z.
-    const pick = <K extends keyof ItRow>(g: ItRow[], k: K) => g.map((e) => e[k]).find((v) => v !== null && v !== "") ?? null;
-    return people_.map((g, i) => ({
+    return group.map((g, i) => ({
       key: String(g[0].id),
-      idNumber: pick(g, "idNumber") as number | null,
-      fullName: pick(g, "completeName") as string | null,
-      email: pick(g, "ms365Email") as string | null,
-      clientName: pick(g, "clientName") as string | null,
+      idNumber: firstValue(g, "idNumber"),
+      fullName: firstValue(g, "completeName"),
+      email: firstValue(g, "ms365Email"),
+      clientName: firstValue(g, "clientName"),
       devices: (byPerson.get(i) ?? []).sort((x, y) => x.localeCompare(y, undefined, { numeric: true })),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
