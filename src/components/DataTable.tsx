@@ -62,6 +62,8 @@ interface DataTableProps<T> {
   exportConfig?: ExportConfig<T>;
   // Trailing cell, e.g. edit/delete buttons.
   actions?: (row: T) => ReactNode;
+  // Extra buttons shown at the end of the toolbar (e.g. a second export).
+  toolbarExtra?: ReactNode;
   // Adds a "Columns" button so users can hide and show columns.
   columnToggle?: boolean;
   // Extra CSS class for a row (e.g. to draw a separator above it).
@@ -85,6 +87,7 @@ export default function DataTable<T>({
   exportConfig,
   actions,
   columnToggle = false,
+  toolbarExtra,
   rowClass,
   loading = false,
   emptyText = "No records found",
@@ -279,6 +282,7 @@ export default function DataTable<T>({
             {exporting ? "Exporting…" : "Export Excel"}
           </button>
         )}
+        {toolbarExtra}
       </div>
 
       {panelOpen && filters.length > 0 && (

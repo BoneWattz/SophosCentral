@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { downloadXlsx } from "@/lib/exportExcel";
+import { IconDownload } from "./icons";
 import DataTable, { type Column, type ExportConfig, type FilterDef } from "./DataTable";
 import { useDevices, type Device } from "@/lib/useDevices";
 import { useItEmployees } from "@/lib/useItEmployees";
@@ -11,16 +13,11 @@ import { firstValue, groupByPerson, lowerEmail, ownerIndex } from "@/lib/itMonit
 type Match = "matched" | "temporary" | "noEmail";
 
 // Estimated state of a device against "Sophos Endpoint - User" licence usage (see licenseStates).
-type LicenseState = "counted" | "shared" | "inactive" | "noUser" | "noIx" | "server";
-
-// Sophos doesn't publish how it counts users. This is the closest rule found against this tenant's data:
-// a user counts once when one of their devices has Intercept X installed and was seen within this many days.
-const ACTIVE_DAYS = 60;
+type LicenseState = "counted" | "shared" | "noUser" | "noIx" | "server";
 
 const LICENSE_LABEL: Record<LicenseState, string> = {
   counted: "Counted",
   shared: "Shares the user's licence",
-  inactive: `Not counted: user inactive ${ACTIVE_DAYS}+ days`,
   noUser: "Not counted: no user",
   noIx: "Not counted: no Intercept X",
   server: "Server licence (separate)",
@@ -52,31 +49,29 @@ const MATCH_LABEL: Record<Match, string> = {
   noEmail: "No Sophos email",
 };
 
-// Works out each device's licence state. Per user: the Intercept X device seen most recently is the one that
-// counts; the user's other devices share that licence. A user whose devices were all last seen long ago is not counted.
-function licenseStates(devices: Device[]): Map<string, LicenseState> {
+// Works out each device's licence state. A person is identified by MS 365 email (so two Sophos users with the
+// same MS 365 email are one person); `keyOf` returns that key. Per person: the Intercept X device seen most
+// recently is the one that counts, and their other devices share that licence. There is no inactivity cut-off.
+function licenseStates(devices: Device[], keyOf: (d: Device) => string | null): Map<string, LicenseState> {
   const installed = (d: Device) => d.interceptX?.status === "installed";
   const seen = (d: Device) => (d.lastSeenAt ? new Date(d.lastSeenAt).getTime() : 0);
-  const cutoff = Date.now() - ACTIVE_DAYS * 86_400_000;
 
-  const best = new Map<string, Device>(); // userId -> most recently seen Intercept X device
+  const best = new Map<string, Device>(); // person -> most recently seen Intercept X device
   for (const d of devices) {
-    if (d.isServer || !d.userId || !installed(d)) continue;
-    const cur = best.get(d.userId);
-    if (!cur || seen(d) > seen(cur)) best.set(d.userId, d);
+    const key = keyOf(d);
+    if (d.isServer || !key || !installed(d)) continue;
+    const cur = best.get(key);
+    if (!cur || seen(d) > seen(cur)) best.set(key, d);
   }
 
   const out = new Map<string, LicenseState>();
   for (const d of devices) {
+    const key = keyOf(d);
     let state: LicenseState;
     if (d.isServer) state = "server";
-    else if (!d.userId) state = "noUser";
+    else if (!key) state = "noUser";
     else if (!installed(d)) state = "noIx";
-    else {
-      const rep = best.get(d.userId)!;
-      if (seen(rep) < cutoff) state = "inactive";
-      else state = rep.id === d.id ? "counted" : "shared";
-    }
+    else state = best.get(key)!.id === d.id ? "counted" : "shared";
     out.set(d.id, state);
   }
   return out;
@@ -189,52 +184,54 @@ export default function FinanceEndpointView() {
     return { list, owner: ownerIndex(list) };
   }, [it.employees]);
 
-  const states = useMemo(() => licenseStates(devices), [devices]);
+  const rows = useMemo<Row[]>(() => {
+    // 1. Who owns each device: MS 365 email from GT - IT Monitoring, or a temporary copy of the Sophos email.
+    const owners = devices.map((d) => {
+      const p = lookupPerson(d.userId);
+      const sophosEmail = p?.email ?? null;
+      const e = lowerEmail(sophosEmail);
+      const i = e ? index.owner.get(e) : undefined;
+      const person = i === undefined ? null : index.list[i];
+      return {
+        p,
+        sophosEmail,
+        person,
+        ms365Email: person ? firstValue(person, "ms365Email") : sophosEmail,
+        match: (person ? "matched" : sophosEmail ? "temporary" : "noEmail") as Match,
+      };
+    });
 
-  const rows = useMemo<Row[]>(
-    () =>
-      devices.map((d) => {
-        const p = lookupPerson(d.userId);
-        const sophosEmail = p?.email ?? null;
-        const e = lowerEmail(sophosEmail);
-        const i = e ? index.owner.get(e) : undefined;
-        const person = i === undefined ? null : index.list[i];
+    // 2. Licence state, one person = one MS 365 email (before emails load, fall back to the Sophos user id).
+    const ownerOf = new Map(devices.map((d, i) => [d.id, owners[i]]));
+    const states = licenseStates(devices, (d) => {
+      if (!d.userId) return null;
+      const email = lowerEmail(ownerOf.get(d.id)?.ms365Email);
+      return email ?? `user:${d.userId}`;
+    });
 
-        const base = {
-          key: d.id,
-          hostname: d.hostname,
-          sophosEmail,
-          groups: p?.groups ?? [],
-          pending: !!d.userId && p === undefined,
-          ixVersion: d.interceptX?.version ?? null,
-          ixStatus: d.interceptX?.status,
-          health: d.health,
-          online: d.online,
-          registeredAt: d.registeredAt,
-          lastSeenAt: d.lastSeenAt,
-          license: states.get(d.id) ?? "noUser",
-        };
-        if (person) {
-          return {
-            ...base,
-            ms365Email: firstValue(person, "ms365Email"),
-            idNumber: firstValue(person, "idNumber"),
-            fullName: firstValue(person, "completeName"),
-            match: "matched" as Match,
-          };
-        }
-        // Sophos email with no GT - IT Monitoring record: copy it as a temporary MS 365 email.
-        return {
-          ...base,
-          ms365Email: sophosEmail,
-          idNumber: null,
-          fullName: null,
-          match: (sophosEmail ? "temporary" : "noEmail") as Match,
-        };
-      }),
+    return devices.map((d, i) => {
+      const o = owners[i];
+      return {
+        key: d.id,
+        hostname: d.hostname,
+        sophosEmail: o.sophosEmail,
+        ms365Email: o.ms365Email,
+        groups: o.p?.groups ?? [],
+        idNumber: o.person ? firstValue(o.person, "idNumber") : null,
+        fullName: o.person ? firstValue(o.person, "completeName") : null,
+        match: o.match,
+        pending: !!d.userId && o.p === undefined,
+        ixVersion: d.interceptX?.version ?? null,
+        ixStatus: d.interceptX?.status,
+        health: d.health,
+        online: d.online,
+        registeredAt: d.registeredAt,
+        lastSeenAt: d.lastSeenAt,
+        license: states.get(d.id) ?? "noUser",
+      };
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [devices, index, states, people.version]
-  );
+  }, [devices, index, people.version]);
 
   const filters = useMemo<FilterDef<Row>[]>(
     () => [
@@ -278,6 +275,58 @@ export default function FinanceEndpointView() {
   const count = (s: LicenseState) => rows.filter((r) => r.license === s).length;
   const counted = count("counted");
   const sophosUsers = licensesState.licenses.find((l) => l.code === "CIXA-MSP")?.count;
+
+  // Per-person file for finance: one row per person (MS 365 email) with all their devices in one cell.
+  interface PersonLine {
+    idNumber: number | null;
+    name: string | null;
+    client: string;
+    email: string | null;
+    devices: string[];
+  }
+  const people_ = useMemo<PersonLine[]>(() => {
+    const byKey = new Map<string, PersonLine>();
+    for (const r of rows) {
+      const email = lowerEmail(r.ms365Email);
+      const key = email ?? `device:${r.key}`; // devices without any email stay as their own line
+      const line = byKey.get(key) ?? { idNumber: null, name: null, client: "", email: r.ms365Email, devices: [] };
+      line.idNumber = line.idNumber ?? r.idNumber;
+      line.name = line.name ?? r.fullName;
+      const clients = new Set(line.client ? line.client.split("; ") : []);
+      r.groups.forEach((g) => clients.add(g));
+      line.client = Array.from(clients).join("; ");
+      line.devices.push(r.hostname);
+      byKey.set(key, line);
+    }
+    return Array.from(byKey.values()).sort((a, b) => (a.email ?? "~").localeCompare(b.email ?? "~"));
+  }, [rows]);
+
+  const [exportingPeople, setExportingPeople] = useState(false);
+  async function exportPeople() {
+    setExportingPeople(true);
+    try {
+      await downloadXlsx<PersonLine>(
+        "finance-by-person",
+        [
+          { header: "ID Number", value: (l) => l.idNumber, width: 12 },
+          { header: "Name", value: (l) => l.name, width: 32 },
+          { header: "Client", value: (l) => l.client, width: 30 },
+          { header: "Email", value: (l) => l.email, width: 34 },
+          {
+            header: "Devices",
+            value: (l) => l.devices.sort((x, y) => x.localeCompare(y, undefined, { numeric: true })).join(", "),
+            width: 50,
+          },
+        ],
+        people_
+      );
+    } catch (err) {
+      console.error(err);
+      alert("Couldn't create the Excel file. Please try again.");
+    } finally {
+      setExportingPeople(false);
+    }
+  }
 
   const exportConfig = useMemo<ExportConfig<Row>>(
     () => ({
@@ -341,12 +390,13 @@ export default function FinanceEndpointView() {
           </div>
           <div className="muted" style={{ fontSize: "0.85rem" }}>
             {rows.length.toLocaleString()} devices = {counted.toLocaleString()} counted + {count("shared").toLocaleString()} sharing a user&apos;s licence +{" "}
-            {count("inactive").toLocaleString()} inactive {ACTIVE_DAYS}+ days + {count("noUser").toLocaleString()} without a user +{" "}
+            {count("noUser").toLocaleString()} without a user +{" "}
             {count("noIx").toLocaleString()} without Intercept X + {count("server").toLocaleString()} server.
           </div>
           <div className="muted" style={{ fontSize: "0.8rem" }}>
-            Sophos doesn&apos;t publish how it counts. The estimate counts each user once when one of their devices has Intercept X installed and was
-            seen in the last {ACTIVE_DAYS} days, so a difference of a few is expected.
+            Sophos doesn&apos;t publish how it counts. The estimate counts each person (one MS 365 email) once when one of their devices has
+            Intercept X installed, however long ago it was seen. Sophos appears to leave out some users who have been idle for months, so a
+            difference of a few is expected.
           </div>
         </div>
       )}
@@ -360,6 +410,18 @@ export default function FinanceEndpointView() {
         filters={filters}
         exportConfig={exportConfig}
         columnToggle
+        toolbarExtra={
+          <button
+            type="button"
+            className="btn secondary filter-btn"
+            onClick={exportPeople}
+            disabled={exportingPeople || !ready || people_.length === 0}
+            title={ready ? `Download ${people_.length.toLocaleString()} people (one row each, all devices in one cell)` : "Still matching devices. Export will be ready in a moment."}
+          >
+            <IconDownload size={16} />
+            {exportingPeople ? "Exporting…" : "Export by person"}
+          </button>
+        }
         loading={devicesState.loading}
         emptyText="No devices found"
       />
