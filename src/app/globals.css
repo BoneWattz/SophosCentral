@@ -282,4 +282,8 @@ td.actions-cell { text-align: right; width: 1%; }
 .col-pop label:hover { background: var(--surface-2); }
 .col-pop input { width: auto; padding: 0; flex: none; accent-color: var(--accent); }
 .col-pop .link-btn { align-self: flex-start; margin: 4px 8px 2px; }
+.multi-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-width: 160px; padding: 9px 12px;
+  font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+}
 .cell-list { display: flex; flex-direction: column; gap: 2px; }

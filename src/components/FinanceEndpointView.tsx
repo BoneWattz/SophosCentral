@@ -240,6 +240,7 @@ export default function FinanceEndpointView() {
         label: "Sophos Endpoint - User license",
         options: (Object.keys(LICENSE_LABEL) as LicenseState[]).map((s) => ({ value: s, label: LICENSE_LABEL[s] })),
         test: (r, v) => r.license === v,
+        multi: true,
       },
       {
         key: "match",

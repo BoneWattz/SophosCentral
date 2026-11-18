@@ -29,12 +29,69 @@ function compareValues(a: string | number | boolean, b: string | number | boolea
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
 }
 
+const SEP = "\u001f"; // joins the ticked values of a multi-select filter
+
+// Dropdown with checkboxes; nothing ticked = Any.
+function MultiSelect({
+  options,
+  selected,
+  onChange,
+}: {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  const labels = options.filter((o) => selected.includes(o.value)).map((o) => o.label);
+  const text = labels.length === 0 ? "Any" : labels.length <= 2 ? labels.join(", ") : `${labels.length} selected`;
+
+  return (
+    <div className="col-menu multi-select" ref={ref}>
+      <button type="button" className="multi-btn" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <span>{text}</span>
+        <span aria-hidden>▾</span>
+      </button>
+      {open && (
+        <div className="col-pop" style={{ left: 0, right: "auto" }}>
+          {options.map((o) => (
+            <label key={o.value}>
+              <input
+                type="checkbox"
+                checked={selected.includes(o.value)}
+                onChange={() => onChange(selected.includes(o.value) ? selected.filter((v) => v !== o.value) : [...selected, o.value])}
+              />
+              {o.label}
+            </label>
+          ))}
+          {selected.length > 0 && (
+            <button type="button" className="link-btn" onClick={() => onChange([])}>
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // One dropdown in the advanced filter panel. A row passes when test(row, selectedValue) is true.
 export interface FilterDef<T> {
   key: string;
   label: string;
   options: { value: string; label: string }[];
   test: (row: T, value: string) => boolean;
+  // Allow ticking several options; a row passes when it matches ANY of them.
+  multi?: boolean;
 }
 
 // Adds an "Export Excel" button that downloads every row matching the current search, filters and sort.
@@ -138,7 +195,7 @@ export default function DataTable<T>({
       (r) =>
         (!filter || filterOf?.(r) === filter) &&
         (!q || searchText(r).toLowerCase().includes(q)) &&
-        active.every((f) => f.test(r, advanced[f.key]))
+        active.every((f) => (f.multi ? advanced[f.key].split(SEP).some((v) => f.test(r, v)) : f.test(r, advanced[f.key])))
     );
   }, [rows, query, filter, filterOf, searchText, filters, advanced]);
 
@@ -292,14 +349,22 @@ export default function DataTable<T>({
             {filters.map((f) => (
               <label key={f.key}>
                 {f.label}
-                <select value={advanced[f.key] ?? ""} onChange={(e) => setAdvancedValue(f.key, e.target.value)}>
-                  <option value="">Any</option>
-                  {f.options.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                {f.multi ? (
+                  <MultiSelect
+                    options={f.options}
+                    selected={advanced[f.key] ? advanced[f.key].split(SEP) : []}
+                    onChange={(vals) => setAdvancedValue(f.key, vals.join(SEP))}
+                  />
+                ) : (
+                  <select value={advanced[f.key] ?? ""} onChange={(e) => setAdvancedValue(f.key, e.target.value)}>
+                    <option value="">Any</option>
+                    {f.options.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </label>
             ))}
           </div>
