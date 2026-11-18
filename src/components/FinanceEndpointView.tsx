@@ -284,9 +284,10 @@ export default function FinanceEndpointView() {
     email: string | null;
     devices: string[];
   }
-  const people_ = useMemo<PersonLine[]>(() => {
+  // Built from the rows currently shown, so search and filters (e.g. licence = Counted) apply to the file too.
+  function personLines(source: Row[]): PersonLine[] {
     const byKey = new Map<string, PersonLine>();
-    for (const r of rows) {
+    for (const r of source) {
       const email = lowerEmail(r.ms365Email);
       const key = email ?? `device:${r.key}`; // devices without any email stay as their own line
       const line = byKey.get(key) ?? { idNumber: null, name: null, client: "", email: r.ms365Email, devices: [] };
@@ -299,10 +300,10 @@ export default function FinanceEndpointView() {
       byKey.set(key, line);
     }
     return Array.from(byKey.values()).sort((a, b) => (a.email ?? "~").localeCompare(b.email ?? "~"));
-  }, [rows]);
+  }
 
   const [exportingPeople, setExportingPeople] = useState(false);
-  async function exportPeople() {
+  async function exportPeople(lines: PersonLine[]) {
     setExportingPeople(true);
     try {
       await downloadXlsx<PersonLine>(
@@ -318,7 +319,7 @@ export default function FinanceEndpointView() {
             width: 50,
           },
         ],
-        people_
+        lines
       );
     } catch (err) {
       console.error(err);
@@ -410,18 +411,21 @@ export default function FinanceEndpointView() {
         filters={filters}
         exportConfig={exportConfig}
         columnToggle
-        toolbarExtra={
-          <button
-            type="button"
-            className="btn secondary filter-btn"
-            onClick={exportPeople}
-            disabled={exportingPeople || !ready || people_.length === 0}
-            title={ready ? `Download ${people_.length.toLocaleString()} people (one row each, all devices in one cell)` : "Still matching devices. Export will be ready in a moment."}
-          >
-            <IconDownload size={16} />
-            {exportingPeople ? "Exporting…" : "Export by person"}
-          </button>
-        }
+        toolbarExtra={(shown: Row[]) => {
+          const lines = personLines(shown);
+          return (
+            <button
+              type="button"
+              className="btn secondary filter-btn"
+              onClick={() => exportPeople(lines)}
+              disabled={exportingPeople || !ready || lines.length === 0}
+              title={ready ? `Download ${lines.length.toLocaleString()} people from the rows shown (one row each, all devices in one cell)` : "Still matching devices. Export will be ready in a moment."}
+            >
+              <IconDownload size={16} />
+              {exportingPeople ? "Exporting…" : "Export by person"}
+            </button>
+          );
+        }}
         loading={devicesState.loading}
         emptyText="No devices found"
       />
