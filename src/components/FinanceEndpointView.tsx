@@ -284,12 +284,15 @@ export default function FinanceEndpointView() {
     email: string | null;
     devices: string[];
   }
-  // Built from the rows currently shown, so search and filters (e.g. licence = Counted) apply to the file too.
-  function personLines(source: Row[]): PersonLine[] {
+  const personKey = (r: Row) => lowerEmail(r.ms365Email) ?? `device:${r.key}`; // no email = its own line
+  // The people come from the rows currently shown (so search and filters such as licence = Counted apply),
+  // but each person lists ALL of their devices, including the ones sharing the licence.
+  function personLines(shown: Row[]): PersonLine[] {
+    const wanted = new Set(shown.map(personKey));
     const byKey = new Map<string, PersonLine>();
-    for (const r of source) {
-      const email = lowerEmail(r.ms365Email);
-      const key = email ?? `device:${r.key}`; // devices without any email stay as their own line
+    for (const r of rows) {
+      const key = personKey(r);
+      if (!wanted.has(key)) continue;
       const line = byKey.get(key) ?? { idNumber: null, name: null, client: "", email: r.ms365Email, devices: [] };
       line.idNumber = line.idNumber ?? r.idNumber;
       line.name = line.name ?? r.fullName;
@@ -419,7 +422,7 @@ export default function FinanceEndpointView() {
               className="btn secondary filter-btn"
               onClick={() => exportPeople(lines)}
               disabled={exportingPeople || !ready || lines.length === 0}
-              title={ready ? `Download ${lines.length.toLocaleString()} people from the rows shown (one row each, all devices in one cell)` : "Still matching devices. Export will be ready in a moment."}
+              title={ready ? `Download ${lines.length.toLocaleString()} people for the rows shown (one row each, all devices in one cell)` : "Still matching devices. Export will be ready in a moment."}
             >
               <IconDownload size={16} />
               {exportingPeople ? "Exporting…" : "Export by person"}
